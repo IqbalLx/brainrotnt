@@ -1,0 +1,13 @@
+{
+  "name": "brainrotnt",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:bridge": "bun --filter bridge dev",
+    "dev:web": "bun --filter web dev",
+    "db:generate": "bun --filter bridge db:generate",
+    "db:migrate": "bun --filter bridge db:migrate"
+  }
+}
