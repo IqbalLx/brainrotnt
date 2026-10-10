@@ -12,9 +12,11 @@
     "test": "bun test"
   },
   "dependencies": {
-    "hono": "^4.6.14",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "drizzle-orm": "^0.38.3",
-    "zod": "^3.24.1"
+    "hono": "^4.6.14",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "drizzle-kit": "^0.30.1",

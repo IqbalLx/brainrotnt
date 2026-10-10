@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { statementHash } from "../content/hash";
 import { db } from "./client";
 import { mcqAnswer, numericAnswer } from "./answer";
 import { problems } from "./schema";
@@ -143,8 +143,6 @@ const SEEDS: Seed[] = [
   },
 ];
 
-const normalize = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
-
 const rows = SEEDS.map((seed) => {
   const type: "mcq" | "numeric" = seed.mcq ? "mcq" : "numeric";
   const answer = seed.mcq ? mcqAnswer.parse(seed.mcq) : numericAnswer.parse(seed.numeric);
@@ -160,7 +158,7 @@ const rows = SEEDS.map((seed) => {
     answer,
     verificationStatus: "verified" as const,
     source: null,
-    statementHash: createHash("sha256").update(`${normalize(seed.statement)}|${seed.topic}`).digest("hex"),
+    statementHash: statementHash(seed.statement, seed.topic),
     createdAt: new Date(),
   };
 });
