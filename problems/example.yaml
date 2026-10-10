@@ -1,0 +1,53 @@
+# Import with:  bun run import problems/example.yaml
+#
+# A file holds a problem, a list of problems, or an object with a `problems` list like this one.
+# Each item is either a problem with a reference solution, or a template that expands into variants.
+# Run `bun run import` on it again and every item is refused as a duplicate, which is expected.
+problems:
+  # A template: one seeded generator becomes 12 distinct problems with computed answers.
+  - subject: physics
+    topic: projectile motion
+    difficulty: 3
+    type: numeric
+    tools: { calculator: scientific, draw: true }
+    answer: { tolerance: 0.01, unit: m }
+    template:
+      statement: "A ball is launched at {v} m/s at {angle} degrees above the horizontal. Ignoring air resistance and using g = 9.8 m/s², how far does it travel before landing?"
+      variants: 12
+      generator: |
+        import math, random
+
+        def generate(seed):
+            rng = random.Random(seed)
+            v = rng.randint(10, 30)
+            angle = rng.choice([25, 30, 35, 40, 45, 50, 55])
+            r = v ** 2 * math.sin(math.radians(2 * angle)) / 9.8
+            return {"params": {"v": v, "angle": angle}, "answer": round(r, 2)}
+
+  # A single numeric problem. The reference solution computes the answer from scratch and prints it.
+  - subject: stats
+    topic: combinations
+    difficulty: 2
+    type: numeric
+    statement: "A committee of 3 people is chosen from a group of 8. How many different committees are possible?"
+    tools: { calculator: stats, draw: false }
+    answer: { value: 56, tolerance: 0 }
+    source: "counting techniques, chapter on combinations"
+    reference:
+      code: |
+        import math
+        print(math.comb(8, 3))
+
+  # A multiple-choice problem. The reference solution prints the index of the correct option.
+  - subject: math
+    topic: derivatives
+    difficulty: 2
+    type: mcq
+    statement: "What is the derivative of sin(x) with respect to x?"
+    answer:
+      options: ["cos(x)", "-cos(x)", "-sin(x)", "tan(x)"]
+      correct: 0
+    reference:
+      code: |
+        options = ["cos(x)", "-cos(x)", "-sin(x)", "tan(x)"]
+        print(options.index("cos(x)"))

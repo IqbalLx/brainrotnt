@@ -119,6 +119,16 @@ def generate(seed):
 
 The server runs the generator in the sandbox for seeds 0 to 49 and accepts it only if every seed works: no exceptions, the same output when called twice with the same seed, params covering every placeholder, a finite answer (or distinct options with a valid correct index for multiple choice), and enough distinct statements for the number of variants asked for. It then expands a fixed number of variants (1 to 50) into the bank as ordinary verified problems with ids like `<id>.s0`, `<id>.s1`, so answers are computed rather than recalled and nothing runs at serve time. A template goes in whole or not at all, and submitting the same one twice is refused.
 
+### Importing from files
+
+The same validation, sandboxed verification and deduplication are available without MCP. Ask Claude Code to write a YAML file, or write one yourself, then:
+
+```sh
+bun run import problems/example.yaml
+```
+
+A file holds a problem, a list of problems, or an object with a `problems` list, and each item is either a problem with a reference solution or a template. `problems/example.yaml` shows all three kinds and is imported by a test, so it stays correct. The command prints one line per item (inserted with its id, or rejected with the reasons), keeps the good items when others fail, and exits 1 if anything was rejected. Importing a file twice refuses every item as a duplicate. It uses the bridge's database (`apps/bridge/bridge.sqlite`, or `DB_PATH`) from any directory.
+
 Flag a bad problem with the Flag button and it leaves rotation. Ask Claude Code to fix the flagged ones: `update_problem` verifies the corrected version, inserts it as the next version (`<id>.v2`), retires the old one and resolves its flags. Your earlier attempts stay attached to the version you answered.
 
 The whole API, including `/mcp`, only answers requests addressed to `localhost`, `127.0.0.1` or `[::1]` and refuses foreign `Origin` headers, so a web page open in your browser (or a DNS-rebinding trick) cannot write to your problem bank. There is no other authentication: it is a local tool.
