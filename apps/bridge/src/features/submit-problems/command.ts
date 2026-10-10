@@ -1,18 +1,23 @@
 import { inArray } from "drizzle-orm";
+import { expandTemplate } from "../../content/expand-template";
 import { generatedId, statementHash } from "../../content/hash";
-import { issuesOf, problemSpec, semanticIssues, type ProblemSpec } from "../../content/problem-spec";
+import { isTemplateItem, issuesOf, problemSpec, semanticIssues, templateSpec, type ProblemSpec } from "../../content/problem-spec";
 import { verifyAll } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { problems } from "../../db/schema";
 
 export const MAX_BATCH = 25;
 
-export type ItemResult = { index: number; status: "inserted"; id: string } | { index: number; status: "rejected"; errors: string[] };
+export type ItemResult =
+  | { index: number; status: "inserted"; id: string; ids?: string[] }
+  | { index: number; status: "rejected"; errors: string[] };
 
 export interface SubmitResult {
   submitted: number;
   inserted: number;
   rejected: number;
+  /** Rows added to the bank: a template item adds one per variant. */
+  problemsAdded: number;
   results: ItemResult[];
 }
 
@@ -31,7 +36,12 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
   };
 
   const candidates: Candidate[] = [];
+  const templateItems: { index: number; raw: unknown }[] = [];
   rawItems.forEach((raw, index) => {
+    if (isTemplateItem(raw)) {
+      templateItems.push({ index, raw });
+      return;
+    }
     const parsed = problemSpec.safeParse(raw);
     if (!parsed.success) return reject(index, issuesOf(parsed.error));
     const issues = semanticIssues(parsed.data);
@@ -103,7 +113,65 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
     for (const { index, id } of accepted) results[index] = { index, status: "inserted", id };
   }
 
-  const inserted = accepted.length;
-  return { submitted: rawItems.length, inserted, rejected: rawItems.length - inserted, results };
+  let problemsAdded = accepted.length;
+  for (const { index, raw } of templateItems) {
+    const outcome = await submitTemplate(raw);
+    if (outcome.ok) {
+      results[index] = { index, status: "inserted", id: outcome.baseId, ids: outcome.ids };
+      problemsAdded += outcome.ids.length;
+    } else {
+      reject(index, outcome.errors);
+    }
+  }
+
+  const inserted = results.filter((r) => r.status === "inserted").length;
+  return { submitted: rawItems.length, inserted, rejected: rawItems.length - inserted, problemsAdded, results };
+}
+
+// A template is one generator expanded into a family of verified variants: all of them go in, or none do.
+async function submitTemplate(raw: unknown): Promise<{ ok: true; baseId: string; ids: string[] } | { ok: false; errors: string[] }> {
+  const parsed = templateSpec.safeParse(raw);
+  if (!parsed.success) return { ok: false, errors: issuesOf(parsed.error) };
+  const spec = parsed.data;
+
+  const expanded = await expandTemplate(spec);
+  if (!expanded.ok) return expanded;
+
+  const baseId = spec.id ?? generatedId(spec.subject, spec.topic, statementHash(spec.template.statement, spec.topic));
+  const ids = expanded.variants.map((v) => `${baseId}.s${v.seed}`);
+
+  const takenIds = await db.select({ id: problems.id }).from(problems).where(inArray(problems.id, ids));
+  if (takenIds.length) return { ok: false, errors: [`id: ${takenIds[0].id} is already taken (this template was already submitted?)`] };
+
+  const clashes = await db
+    .select({ id: problems.id, status: problems.verificationStatus })
+    .from(problems)
+    .where(inArray(problems.statementHash, expanded.variants.map((v) => v.hash)));
+  const live = clashes.find((row) => row.status !== "retired");
+  if (live) return { ok: false, errors: [`duplicate: a variant has the same statement and topic as ${live.id}`] };
+
+  const now = new Date();
+  db.transaction((tx) => {
+    expanded.variants.forEach((variant, i) => {
+      tx.insert(problems)
+        .values({
+          id: ids[i],
+          version: 1,
+          subject: spec.subject,
+          topic: spec.topic,
+          difficulty: spec.difficulty,
+          type: spec.type,
+          statement: variant.statement,
+          tools: spec.tools,
+          answer: variant.answer,
+          verificationStatus: "verified",
+          source: spec.source ?? null,
+          statementHash: variant.hash,
+          createdAt: now,
+        })
+        .run();
+    });
+  });
+  return { ok: true, baseId, ids };
 }
 
