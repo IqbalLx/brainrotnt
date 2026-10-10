@@ -10,6 +10,6 @@
     "db:generate": "bun --filter bridge db:generate",
     "db:migrate": "bun --filter bridge db:migrate",
     "db:seed": "bun --filter bridge db:seed",
-    "test": "bun --filter bridge test"
+    "test": "bun --filter bridge test && bun --filter web test"
   }
 }
