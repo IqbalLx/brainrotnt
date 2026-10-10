@@ -33,7 +33,7 @@ export function AgentStateBanner({ status, event }: { status: AgentState; event:
       <Icon className={cn("size-5", status === "working" && "animate-spin")} />
       <div className="flex-1">
         <div className="font-medium">{detail}</div>
-        {event && (
+        {event?.agent && (
           <div className={cn("text-xs", blocked ? "text-white/80" : "text-muted-foreground")}>
             {event.agent} · {event.cwd}
             {event.branch ? ` · ${event.branch}` : ""}

@@ -7,14 +7,14 @@ export function createAgentStateStreamRoute(uhpClient: UhpClient) {
 
   route.get("/", (c) => {
     return streamSSE(c, async (stream) => {
-      const unsubscribe = uhpClient.onStateChange(async (event) => {
-        await stream.writeSSE({
-          event: "agent-state",
-          data: JSON.stringify(event),
-        });
-      });
+      const send = (event: unknown) =>
+        stream.writeSSE({ event: "agent-state", data: JSON.stringify(event) });
 
+      const unsubscribe = uhpClient.onStateChange((event) => void send(event));
       stream.onAbort(() => unsubscribe());
+
+      const current = uhpClient.current();
+      if (current) await send(current);
 
       // Keep the connection open; events arrive only through the listener above.
       while (true) {
