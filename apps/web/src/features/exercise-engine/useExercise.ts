@@ -83,7 +83,7 @@ export function useExercise(subject: string, difficulty: { min: number; max: num
   }, [load]);
 
   const submit = useCallback(
-    async (answer: string | number) => {
+    async (answer: string | number, toolsUsed: string[] = []) => {
       if (!problem) return;
       setPhase("submitting");
       setMessage(null);
@@ -96,7 +96,7 @@ export function useExercise(subject: string, difficulty: { min: number; max: num
             answer,
             secondsSpent: Math.round(((performance.now() - startedAt.current) / 1000) * 10) / 10,
             agentState: agentAtStart.current,
-            toolsUsed: [],
+            toolsUsed,
           }),
         });
         const body = await res.json();

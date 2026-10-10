@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { effectiveTier, type CalculatorTier } from "../settings/settings";
 import { AnswerInput } from "./AnswerInput";
 import type { AttemptResult, Phase, Problem } from "./useExercise";
 
+const CalculatorPanel = lazy(() => import("../calculator/CalculatorPanel"));
+
 interface ProblemCardProps {
   problem: Problem | null;
   phase: Phase;
@@ -15,7 +17,7 @@ interface ProblemCardProps {
   message: string | null;
   flagged: boolean;
   calculatorCeiling: CalculatorTier;
-  onSubmit: (answer: string | number) => void;
+  onSubmit: (answer: string | number, toolsUsed: string[]) => void;
   onFlag: () => void;
   onNext: () => void;
 }
@@ -76,9 +78,21 @@ function DifficultyDots({ value }: { value: number }) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-function ActiveProblem({ problem, phase, result, message, flagged, calculatorCeiling, onSubmit, onFlag, onNext }: ProblemCardProps & { problem: Problem }) {
+function ActiveProblem({
+  problem,
+  phase,
+  result,
+  message,
+  flagged,
+  calculatorCeiling,
+  onSubmit,
+  onFlag,
+  onNext,
+}: ProblemCardProps & { problem: Problem }) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
+  const [usedCalculator, setUsedCalculator] = useState(false);
+  const tier = effectiveTier(problem.tools.calculator, calculatorCeiling);
 
   const locked = phase === "submitting" || phase === "result";
   const canSubmit = !locked && (problem.type === "mcq" ? choice !== null : text.trim() !== "");
@@ -86,63 +100,70 @@ function ActiveProblem({ problem, phase, result, message, flagged, calculatorCei
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
-    onSubmit(problem.type === "mcq" ? (choice as number) : text.trim());
+    onSubmit(problem.type === "mcq" ? (choice as number) : text.trim(), usedCalculator ? ["calculator"] : []);
   }
 
   return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Badge variant="brand">{problem.subject}</Badge>
-          <DifficultyDots value={problem.difficulty} />
+    <>
+      <Card>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Badge variant="brand">{problem.subject}</Badge>
+            <DifficultyDots value={problem.difficulty} />
+          </div>
+          <Button variant={flagged ? "flagged" : "outline"} size="sm" disabled={flagged} onClick={onFlag}>
+            <Flag className="size-4" aria-hidden />
+            {flagged ? "Flagged" : "Flag"}
+          </Button>
         </div>
-        <Button variant={flagged ? "flagged" : "outline"} size="sm" disabled={flagged} onClick={onFlag}>
-          <Flag className="size-4" aria-hidden />
-          {flagged ? "Flagged" : "Flag"}
-        </Button>
-      </div>
 
-      <p className="text-body text-ink">{problem.statement}</p>
+        <p className="text-body text-ink">{problem.statement}</p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <AnswerInput
-          problem={problem}
-          text={text}
-          choice={choice}
-          onText={setText}
-          onChoice={setChoice}
-          result={result}
-          locked={locked}
-        />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <AnswerInput
+            problem={problem}
+            text={text}
+            choice={choice}
+            onText={setText}
+            onChoice={setChoice}
+            result={result}
+            locked={locked}
+          />
 
-        {message && (
-          <p role="alert" className="text-body-sm text-danger">
-            {message}
-          </p>
-        )}
-
-        <div className="flex items-center gap-3">
-          {phase === "result" ? (
-            <Button type="button" autoFocus onClick={onNext}>
-              Next problem
-            </Button>
-          ) : (
-            <>
-              <Button type="submit" disabled={!canSubmit}>
-                {phase === "submitting" ? "Checking" : "Submit"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={onNext} disabled={phase === "submitting"}>
-                Skip
-              </Button>
-            </>
+          {message && (
+            <p role="alert" className="text-body-sm text-danger">
+              {message}
+            </p>
           )}
-        </div>
-      </form>
 
-      <div className="flex gap-3 border-t border-border pt-4">
-        <Badge variant="muted">Calculator: {capitalize(effectiveTier(problem.tools.calculator, calculatorCeiling))}</Badge>
-        <Badge variant="muted">Draw: {problem.tools.draw ? "on" : "off"}</Badge>
-      </div>
-    </Card>
+          <div className="flex items-center gap-3">
+            {phase === "result" ? (
+              <Button type="button" autoFocus onClick={onNext}>
+                Next problem
+              </Button>
+            ) : (
+              <>
+                <Button type="submit" disabled={!canSubmit}>
+                  {phase === "submitting" ? "Checking" : "Submit"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={onNext} disabled={phase === "submitting"}>
+                  Skip
+                </Button>
+              </>
+            )}
+          </div>
+        </form>
+
+        <div className="flex gap-3 border-t border-border pt-4">
+          <Badge variant="muted">Calculator: {capitalize(tier)}</Badge>
+          <Badge variant="muted">Draw: {problem.tools.draw ? "on" : "off"}</Badge>
+        </div>
+      </Card>
+      {tier !== "none" && (
+        <Suspense fallback={null}>
+          <CalculatorPanel tier={tier} onUsed={() => setUsedCalculator(true)} />
+        </Suspense>
+      )}
+    </>
   );
 }
