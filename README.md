@@ -106,6 +106,19 @@ Then ask for what you want, for example "use brainrotnt to add 5 stats problems 
 
 The server only accepts what it can verify. Every problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
 
+For quantitative topics, Claude Code can submit a **template** instead of many hand-written problems: one statement with `{placeholders}` and a seeded Python generator.
+
+```python
+import math, random
+def generate(seed):
+    rng = random.Random(seed)
+    v = rng.randint(10, 30)
+    angle = rng.choice([25, 30, 35, 40, 45, 50, 55])
+    return {"params": {"v": v, "angle": angle}, "answer": round(v**2 * math.sin(math.radians(2 * angle)) / 9.8, 2)}
+```
+
+The server runs the generator in the sandbox for seeds 0 to 49 and accepts it only if every seed works: no exceptions, the same output when called twice with the same seed, params covering every placeholder, a finite answer (or distinct options with a valid correct index for multiple choice), and enough distinct statements for the number of variants asked for. It then expands a fixed number of variants (1 to 50) into the bank as ordinary verified problems with ids like `<id>.s0`, `<id>.s1`, so answers are computed rather than recalled and nothing runs at serve time. A template goes in whole or not at all, and submitting the same one twice is refused.
+
 Flag a bad problem with the Flag button and it leaves rotation. Ask Claude Code to fix the flagged ones: `update_problem` verifies the corrected version, inserts it as the next version (`<id>.v2`), retires the old one and resolves its flags. Your earlier attempts stay attached to the version you answered.
 
 The whole API, including `/mcp`, only answers requests addressed to `localhost`, `127.0.0.1` or `[::1]` and refuses foreign `Origin` headers, so a web page open in your browser (or a DNS-rebinding trick) cannot write to your problem bank. There is no other authentication: it is a local tool.

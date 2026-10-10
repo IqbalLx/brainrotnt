@@ -71,6 +71,17 @@ describe("MCP endpoint", () => {
     expect((await call("get_coverage")).body.total).toBe(1);
   });
 
+  test("a template submitted over MCP expands into computed variants", async () => {
+    const generator = "import random\ndef generate(seed):\n    v = random.Random(seed).randint(2, 40)\n    return {'params': {'v': v}, 'answer': v * v}";
+    const { body, isError } = await call("submit_problems", {
+      problems: [{ subject: "math", topic: "squares", difficulty: 1, type: "numeric", template: { statement: "What is {v} squared? Give a whole number.", generator, variants: 8 }, answer: { tolerance: 0 } }],
+    });
+    expect(isError).toBe(false);
+    expect(body).toMatchObject({ inserted: 1, problemsAdded: 8 });
+    expect(body.results[0].ids).toHaveLength(8);
+    expect((await call("get_coverage")).body).toMatchObject({ total: 8, rows: [{ topic: "squares", verified: 8 }] });
+  });
+
   test("a failed repair is reported as a tool error with the reason", async () => {
     const missing = await call("update_problem", { id: "nope", problem: numericSpec() });
     expect(missing.isError).toBe(true);

@@ -35,8 +35,9 @@ export function createMcpServer(): McpServer {
     "submit_problems",
     {
       description:
-        `Validate, verify and insert up to ${MAX_BATCH} problems (shape: see get_schema). Each problem's reference solution is run in a sandbox and ` +
-        "must reproduce the stated answer. Items are handled independently: the result lists each item as inserted (with its id) or rejected " +
+        `Validate, verify and insert up to ${MAX_BATCH} items (shapes: see get_schema). An item is either a problem with a reference solution, ` +
+        "which is run in a sandbox and must reproduce the stated answer, or a template (an object with a `template` key) whose seeded generator is " +
+        "checked over 50 seeds and expanded into distinct computed variants. Items are handled independently: the result lists each item as inserted (with its id) or rejected " +
         "(with its errors) so you can fix and resubmit only the rejected ones.",
       inputSchema: { problems: z.array(z.unknown()).min(1).max(MAX_BATCH).describe("Problem objects, each shaped as get_schema describes.") },
     },
