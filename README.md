@@ -82,6 +82,10 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 | `GET /api/session-summary?since=<ISO time>` | attempts, correct, accuracy and a per-subject breakdown since that time |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
 
+## Settings
+
+The bar above the problem sets the subject, a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+
 ## Runs and the session summary
 
 A run is the stretch where the agent is Working or Blocked. The timer counts through it, pauses when the agent is Done or Idle, and starts again from zero on the next run. When a run ends in Done and you answered at least one problem during it, a session summary is offered: attempts, accuracy, elapsed time and a per-subject breakdown. Dismiss it with the button or Escape; it is not shown again for that run.

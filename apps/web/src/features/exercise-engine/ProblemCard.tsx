@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { effectiveTier, type CalculatorTier } from "../settings/settings";
 import { AnswerInput } from "./AnswerInput";
 import type { AttemptResult, Phase, Problem } from "./useExercise";
 
@@ -13,6 +14,7 @@ interface ProblemCardProps {
   result: AttemptResult | null;
   message: string | null;
   flagged: boolean;
+  calculatorCeiling: CalculatorTier;
   onSubmit: (answer: string | number) => void;
   onFlag: () => void;
   onNext: () => void;
@@ -49,9 +51,9 @@ export function ProblemCard(props: ProblemCardProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>No problems in this subject</CardTitle>
+          <CardTitle>No problems match these settings</CardTitle>
           <CardDescription>
-            Run <code className="text-code">bun run db:seed</code> or pick another subject.
+            Widen the difficulty range, pick another subject, or run <code className="text-code">bun run db:seed</code>.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -74,7 +76,7 @@ function DifficultyDots({ value }: { value: number }) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-function ActiveProblem({ problem, phase, result, message, flagged, onSubmit, onFlag, onNext }: ProblemCardProps & { problem: Problem }) {
+function ActiveProblem({ problem, phase, result, message, flagged, calculatorCeiling, onSubmit, onFlag, onNext }: ProblemCardProps & { problem: Problem }) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
 
@@ -138,7 +140,7 @@ function ActiveProblem({ problem, phase, result, message, flagged, onSubmit, onF
       </form>
 
       <div className="flex gap-3 border-t border-border pt-4">
-        <Badge variant="muted">Calculator: {capitalize(problem.tools.calculator)}</Badge>
+        <Badge variant="muted">Calculator: {capitalize(effectiveTier(problem.tools.calculator, calculatorCeiling))}</Badge>
         <Badge variant="muted">Draw: {problem.tools.draw ? "on" : "off"}</Badge>
       </div>
     </Card>
