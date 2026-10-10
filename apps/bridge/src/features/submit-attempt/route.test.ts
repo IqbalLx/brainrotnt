@@ -31,6 +31,14 @@ describe("POST /api/attempts", () => {
     expect(rows[0].agentStateAtStart).toBe("working");
   });
 
+  test("records which tools were used", async () => {
+    const id = await insertProblem();
+    await submitAttemptRoute.request("/", postJson({ ...attempt(id, "42"), toolsUsed: ["calculator"] }));
+    await submitAttemptRoute.request("/", postJson(attempt(id, "42")));
+    const rows = await db.select().from(attempts).where(eq(attempts.problemId, id));
+    expect(rows.map((r) => r.toolsUsed).sort()).toEqual([[], ["calculator"]]);
+  });
+
   test("invalid answers are rejected and never recorded", async () => {
     const id = await insertProblem();
     const res = await submitAttemptRoute.request("/", postJson(attempt(id, "banana")));

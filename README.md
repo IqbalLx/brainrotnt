@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems, the calculator, the drawing board and the problem-generation pipeline are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems, the drawing board and the problem-generation pipeline are not built yet.
 
 ## Prerequisites
 
@@ -85,6 +85,18 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 ## Settings
 
 The bar above the problem sets the subject, a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+
+## Calculator
+
+Problems that allow a calculator show a panel under the card. The tier is enforced in code, not hidden in the UI, in two layers: the maths library instance has its escape hatches (`import`, `evaluate`, `parse`, `simplify`, `derivative`, ...) replaced with errors and its factorial and combinatorics capped, and every expression's syntax tree is checked against the tier's whitelist before anything is evaluated.
+
+| Tier | Allowed |
+|---|---|
+| basic | `+ - * / ^`, unary minus, `sqrt`, percent, parentheses |
+| scientific | basic plus `sin cos tan asin acos atan`, `log` (natural), `log10`, `exp`, `pi`, `e`, factorial (angles in radians) |
+| stats | scientific plus `mean`, `std` (sample), `combinations`, `permutations` |
+
+Assignments, matrices, ranges, units, strings, comparisons and modulo are never allowed. Keys above the tier are shown disabled rather than removed. After `+` or `-`, a percentage is of the left side, as on a handheld calculator (`200+10%` is `220`). When you use the calculator on a problem, the attempt is recorded with `toolsUsed: ["calculator"]`. The maths library loads only when a calculator is first shown.
 
 ## Runs and the session summary
 
