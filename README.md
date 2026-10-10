@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early walking skeleton. You can see live agent state and one fallback problem. Answer submission, grading, the calculator, the drawing board and the problem pipeline are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, and get graded instantly with every attempt recorded. Symbolic and code problems, the calculator, the drawing board and the problem-generation pipeline are not built yet.
 
 ## Prerequisites
 
@@ -17,11 +17,12 @@ From the repo root:
 ```sh
 bun install          # install both apps
 bun run db:migrate   # create apps/bridge/bridge.sqlite
+bun run db:seed      # load the starter problems (safe to re-run)
 bun run dev:bridge   # terminal 1: API on http://127.0.0.1:8787
 bun run dev:web      # terminal 2: UI on http://localhost:5173
 ```
 
-Open http://localhost:5173. Without Luvus connected, the bridge uses a mock agent that cycles working, blocked, working, done and idle every 5 seconds, so you can see the banner react.
+Open http://localhost:5173, pick a subject and answer a problem. Without Luvus connected, the bridge uses a mock agent that cycles working, blocked, working, done and idle every 5 seconds, so you can see the banner react.
 
 Run `bun run db:migrate` again whenever the schema changes (`bun run db:generate` creates a new migration after you edit `apps/bridge/src/db/schema.ts`).
 
@@ -61,11 +62,28 @@ apps/
     src/components/ui/ shadcn components
 ```
 
-API endpoints: `GET /api/health`, `GET /api/problems/next?subject=math|stats|physics|code`, and `GET /api/agent-state/stream` (server-sent events).
+## How answers are graded
+
+Grading happens on the bridge, so the answer key never reaches the browser. Every valid submission is stored in the `attempts` table with the answer, correctness, time taken and the agent state when the problem was shown.
+
+- **Multiple choice:** the chosen option must be the correct one.
+- **Numeric:** the value must be within the problem's relative tolerance (absolute when the answer is 0). You can type `12.4`, `1.2e3` or a fraction like `5/36`. If the problem has a unit, you can omit it, but a wrong unit counts as incorrect.
+- **Symbolic and code** problems are not gradable yet, so they are never served.
+- Input that cannot be parsed (for example `banana`) is rejected without being recorded as an attempt.
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/health` | liveness check |
+| `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
+| `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}` |
+| `GET /api/agent-state/stream` | server-sent events with the current agent state |
 
 ## Checks
 
 ```sh
+bun run test                          # grading unit tests
 cd apps/bridge && bunx tsc --noEmit   # typecheck the bridge
 cd apps/web && bun run build          # typecheck and build the UI
 ```

@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
 import { getNextProblemRoute } from "./features/get-next-problem/route";
+import { submitAttemptRoute } from "./features/submit-attempt/route";
 
 const app = new Hono();
 app.use("/api/*", cors({ origin: process.env.WEB_ORIGIN ?? "http://localhost:5173" }));
@@ -12,6 +13,7 @@ await uhpClient.start();
 
 app.route("/api/agent-state/stream", createAgentStateStreamRoute(uhpClient));
 app.route("/api/problems/next", getNextProblemRoute);
+app.route("/api/attempts", submitAttemptRoute);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 

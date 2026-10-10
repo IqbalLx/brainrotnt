@@ -1,5 +1,6 @@
-import { and, between, eq, sql } from "drizzle-orm";
+import { and, between, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/client";
+import { GRADABLE_TYPES, mcqAnswer, numericAnswer } from "../../db/answer";
 import { problems } from "../../db/schema";
 import type { GetNextProblemQuery } from "./schema";
 
@@ -11,19 +12,11 @@ export interface ProblemView {
   type: string;
   statement: string;
   tools: unknown;
+  choices: string[] | null;
+  unit: string | null;
 }
 
-const FALLBACK_PROBLEM: ProblemView = {
-  id: "fallback-arith-001",
-  subject: "math",
-  topic: "arithmetic",
-  difficulty: 1,
-  type: "numeric",
-  statement: "A 2 minute exercise while your agent works: what is 17 × 24?",
-  tools: { calculator: "none", draw: false },
-};
-
-export async function getNextProblem(filters: GetNextProblemQuery): Promise<ProblemView> {
+export async function getNextProblem(filters: GetNextProblemQuery): Promise<ProblemView | null> {
   const rows = await db
     .select({
       id: problems.id,
@@ -33,17 +26,29 @@ export async function getNextProblem(filters: GetNextProblemQuery): Promise<Prob
       type: problems.type,
       statement: problems.statement,
       tools: problems.tools,
+      answer: problems.answer,
     })
     .from(problems)
     .where(
       and(
         eq(problems.subject, filters.subject),
         eq(problems.verificationStatus, "verified"),
+        inArray(problems.type, [...GRADABLE_TYPES]),
         between(problems.difficulty, filters.minDifficulty, filters.maxDifficulty),
+        filters.exclude.length > 0 ? notInArray(problems.id, filters.exclude) : undefined,
       ),
     )
     .orderBy(sql`random()`)
     .limit(1);
 
-  return rows[0] ?? FALLBACK_PROBLEM;
+  const row = rows[0];
+  if (!row) return null;
+
+  // The answer key stays on the server; only what the UI needs to render is exposed.
+  const { answer, ...rest } = row;
+  return {
+    ...rest,
+    choices: row.type === "mcq" ? mcqAnswer.parse(answer).options : null,
+    unit: row.type === "numeric" ? (numericAnswer.parse(answer).unit ?? null) : null,
+  };
 }
