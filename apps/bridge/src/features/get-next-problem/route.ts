@@ -11,5 +11,6 @@ getNextProblemRoute.get("/", async (c) => {
   }
 
   const problem = await getNextProblem(parsed.data);
+  if (!problem) return c.json({ error: "no_problems" }, 404);
   return c.json(problem);
 });

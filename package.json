@@ -8,6 +8,8 @@
     "dev:bridge": "bun --filter bridge dev",
     "dev:web": "bun --filter web dev",
     "db:generate": "bun --filter bridge db:generate",
-    "db:migrate": "bun --filter bridge db:migrate"
+    "db:migrate": "bun --filter bridge db:migrate",
+    "db:seed": "bun --filter bridge db:seed",
+    "test": "bun --filter bridge test"
   }
 }
