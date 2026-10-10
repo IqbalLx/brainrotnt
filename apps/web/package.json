@@ -11,6 +11,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@radix-ui/react-slot": "^1.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vite-plugin-static-copy": "^4.1.1"
   }
 }

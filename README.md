@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems and the drawing board are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems are not built yet.
 
 ## Prerequisites
 
@@ -138,6 +138,10 @@ The whole API, including `/mcp`, only answers requests addressed to `localhost`,
 Problems added through the content pipeline carry Python code (reference solutions and generators) written by an AI agent, possibly from injected source material, so it is never trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
 
 Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH.
+
+## Drawing board
+
+Problems that allow it show a **Drawing board** section with an Open button, for working things out on a canvas ([Excalidraw](https://excalidraw.com)). Nothing is loaded until you open it, because the editor is large (about 340 kB gzipped). The canvas is fresh for every problem and is discarded when you move on; hiding it keeps your drawing for the rest of that problem, and nothing is ever saved or uploaded. Its fonts are copied into the app at build time, so it works offline and makes no requests beyond localhost. If you drew something, the attempt is recorded with `toolsUsed: ["draw"]`.
 
 ## Calculator
 
