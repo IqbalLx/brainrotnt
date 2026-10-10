@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { localOnly } from "./infra/local-only";
+import { mcpRoute } from "./mcp/route";
 import { getSandboxMode } from "./infra/sandbox-runner";
 import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
@@ -9,6 +11,7 @@ import { sessionSummaryRoute } from "./features/session-summary/route";
 import { submitAttemptRoute } from "./features/submit-attempt/route";
 
 const app = new Hono();
+app.use("*", localOnly);
 app.use("/api/*", cors({ origin: process.env.WEB_ORIGIN ?? "http://localhost:5173" }));
 
 const sandbox = await getSandboxMode();
@@ -28,6 +31,8 @@ app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
 app.route("/api/session-summary", sessionSummaryRoute);
+
+app.route("/mcp", mcpRoute);
 
 app.get("/api/health", (c) => c.json({ ok: true, sandbox }));
 

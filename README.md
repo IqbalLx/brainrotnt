@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems, the drawing board and the problem-generation pipeline are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems and the drawing board are not built yet.
 
 ## Prerequisites
 
@@ -85,6 +85,30 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 ## Settings
 
 The bar above the problem sets the subject, a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+
+## Adding problems with Claude Code
+
+The bridge exposes an MCP endpoint, so Claude Code can grow the problem bank using the subscription you already have. Add it once:
+
+```sh
+claude mcp add --transport http brainrotnt http://127.0.0.1:8787/mcp
+```
+
+Then ask for what you want, for example "use brainrotnt to add 5 stats problems on confidence intervals, difficulty 2 to 4". Claude Code gets five tools:
+
+| Tool | Purpose |
+|---|---|
+| `get_schema` | the problem schema, allowed values and limits (it starts here) |
+| `get_coverage` | counts per subject, topic and difficulty, to find gaps |
+| `submit_problems` | verify and insert up to 25 problems; each item comes back inserted or rejected with its errors |
+| `list_flagged` | problems you flagged in the UI, with their key and your reasons |
+| `update_problem` | replace a problem after repair |
+
+The server only accepts what it can verify. Every problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
+
+Flag a bad problem with the Flag button and it leaves rotation. Ask Claude Code to fix the flagged ones: `update_problem` verifies the corrected version, inserts it as the next version (`<id>.v2`), retires the old one and resolves its flags. Your earlier attempts stay attached to the version you answered.
+
+The whole API, including `/mcp`, only answers requests addressed to `localhost`, `127.0.0.1` or `[::1]` and refuses foreign `Origin` headers, so a web page open in your browser (or a DNS-rebinding trick) cannot write to your problem bank. There is no other authentication: it is a local tool.
 
 ## Sandbox for generated code
 
