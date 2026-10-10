@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { AgentStateBadge, BlockedBanner } from "@/features/agent-state/AgentStatus";
 import { useAgentState } from "@/features/agent-state/useAgentState";
 import { ProblemCard } from "@/features/exercise-engine/ProblemCard";
-import { SubjectSettingsBar, type SubjectId } from "@/features/exercise-engine/SubjectSettingsBar";
+import { SubjectSettingsBar } from "@/features/exercise-engine/SubjectSettingsBar";
 import { useExercise } from "@/features/exercise-engine/useExercise";
+import { useSettings } from "@/features/settings/useSettings";
 import { RunTimer } from "@/features/run-timer/RunTimer";
 import { useRunTimer } from "@/features/run-timer/useRunTimer";
 import { SessionSummary } from "@/features/session-summary/SessionSummary";
@@ -11,8 +11,8 @@ import { useSessionSummary } from "@/features/session-summary/useSessionSummary"
 
 export default function App() {
   const { event, status } = useAgentState();
-  const [subject, setSubject] = useState<SubjectId>("math");
-  const exercise = useExercise(subject, status);
+  const { settings, update } = useSettings();
+  const exercise = useExercise(settings.subject, { min: settings.minDifficulty, max: settings.maxDifficulty }, status);
   const timer = useRunTimer(status);
   const { summary, dismiss } = useSessionSummary(status, timer.runId, timer.startedAt);
 
@@ -28,13 +28,14 @@ export default function App() {
           <AgentStateBadge status={status} />
         </header>
         <RunTimer elapsedMs={timer.elapsedMs} />
-        <SubjectSettingsBar subject={subject} onSubject={setSubject} />
+        <SubjectSettingsBar settings={settings} onChange={update} />
         <ProblemCard
           problem={exercise.problem}
           phase={exercise.phase}
           result={exercise.result}
           message={exercise.message}
           flagged={exercise.flagged}
+          calculatorCeiling={settings.calculator}
           onSubmit={exercise.submit}
           onFlag={exercise.flag}
           onNext={exercise.next}

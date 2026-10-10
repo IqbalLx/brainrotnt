@@ -20,7 +20,7 @@ export interface AttemptResult {
 
 export type Phase = "loading" | "answering" | "submitting" | "result" | "empty" | "error";
 
-export function useExercise(subject: string, agentState: AgentState) {
+export function useExercise(subject: string, difficulty: { min: number; max: number }, agentState: AgentState) {
   const [problem, setProblem] = useState<Problem | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [result, setResult] = useState<AttemptResult | null>(null);
@@ -36,11 +36,11 @@ export function useExercise(subject: string, agentState: AgentState) {
 
   const fetchProblem = useCallback(
     async (exclude: string[]) => {
-      const params = new URLSearchParams({ subject });
+      const params = new URLSearchParams({ subject, minDifficulty: String(difficulty.min), maxDifficulty: String(difficulty.max) });
       if (exclude.length > 0) params.set("exclude", exclude.join(","));
       return fetch(`/api/problems/next?${params}`);
     },
-    [subject],
+    [subject, difficulty.min, difficulty.max],
   );
 
   const load = useCallback(async () => {
