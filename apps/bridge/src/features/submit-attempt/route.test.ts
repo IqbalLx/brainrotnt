@@ -1,8 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { attempts } from "../../db/schema";
-import { insertProblem, json, postJson } from "../../test-support";
+import { insertProblem, json, postJson, resetDb } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitAttemptRoute } from "./route";
 
@@ -12,6 +12,8 @@ const attempt = (problemId: string, answer: string | number) => ({
   secondsSpent: 4.5,
   agentState: "working",
 });
+
+beforeEach(resetDb);
 
 describe("POST /api/attempts", () => {
   test("grades, records and reveals the expected answer", async () => {
