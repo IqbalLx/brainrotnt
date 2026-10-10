@@ -4,6 +4,7 @@ import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
 import { flagProblemRoute } from "./features/flag-problem/route";
 import { getNextProblemRoute } from "./features/get-next-problem/route";
+import { sessionSummaryRoute } from "./features/session-summary/route";
 import { submitAttemptRoute } from "./features/submit-attempt/route";
 
 const app = new Hono();
@@ -16,6 +17,7 @@ app.route("/api/agent-state/stream", createAgentStateStreamRoute(uhpClient));
 app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
+app.route("/api/session-summary", sessionSummaryRoute);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 

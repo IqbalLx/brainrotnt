@@ -4,11 +4,17 @@ import { useAgentState } from "@/features/agent-state/useAgentState";
 import { ProblemCard } from "@/features/exercise-engine/ProblemCard";
 import { SubjectSettingsBar, type SubjectId } from "@/features/exercise-engine/SubjectSettingsBar";
 import { useExercise } from "@/features/exercise-engine/useExercise";
+import { RunTimer } from "@/features/run-timer/RunTimer";
+import { useRunTimer } from "@/features/run-timer/useRunTimer";
+import { SessionSummary } from "@/features/session-summary/SessionSummary";
+import { useSessionSummary } from "@/features/session-summary/useSessionSummary";
 
 export default function App() {
   const { event, status } = useAgentState();
   const [subject, setSubject] = useState<SubjectId>("math");
   const exercise = useExercise(subject, status);
+  const timer = useRunTimer(status);
+  const { summary, dismiss } = useSessionSummary(status, timer.runId, timer.startedAt);
 
   return (
     <>
@@ -21,6 +27,7 @@ export default function App() {
           </div>
           <AgentStateBadge status={status} />
         </header>
+        <RunTimer elapsedMs={timer.elapsedMs} />
         <SubjectSettingsBar subject={subject} onSubject={setSubject} />
         <ProblemCard
           problem={exercise.problem}
@@ -33,6 +40,7 @@ export default function App() {
           onNext={exercise.next}
         />
       </main>
+      {summary && <SessionSummary summary={summary} elapsedMs={timer.elapsedMs} onDismiss={dismiss} />}
     </>
   );
 }

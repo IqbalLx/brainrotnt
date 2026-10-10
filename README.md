@@ -79,7 +79,12 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}` |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
+| `GET /api/session-summary?since=<ISO time>` | attempts, correct, accuracy and a per-subject breakdown since that time |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
+
+## Runs and the session summary
+
+A run is the stretch where the agent is Working or Blocked. The timer counts through it, pauses when the agent is Done or Idle, and starts again from zero on the next run. When a run ends in Done and you answered at least one problem during it, a session summary is offered: attempts, accuracy, elapsed time and a per-subject breakdown. Dismiss it with the button or Escape; it is not shown again for that run.
 
 ## Look and feel
 
@@ -90,7 +95,7 @@ Agent state names are shown exactly as Luvus reports them (Idle, Working, Blocke
 ## Checks
 
 ```sh
-bun run test                          # grading unit tests and API route tests (temp database)
+bun run test                          # bridge grading and API route tests (temp database), web timer tests
 cd apps/bridge && bunx tsc --noEmit   # typecheck the bridge
 cd apps/web && bun run build          # typecheck and build the UI
 ```

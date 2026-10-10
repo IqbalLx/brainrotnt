@@ -1,10 +1,12 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
-import { insertProblem, json, postJson } from "../../test-support";
+import { insertProblem, json, postJson, resetDb } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { flagProblemRoute } from "./route";
+
+beforeEach(resetDb);
 
 describe("POST /api/flags", () => {
   test("records the flag, marks the problem flagged and stops serving it", async () => {
