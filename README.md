@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, and get graded instantly with every attempt recorded. Symbolic and code problems, the calculator, the drawing board and the problem-generation pipeline are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems, the calculator, the drawing board and the problem-generation pipeline are not built yet.
 
 ## Prerequisites
 
@@ -78,12 +78,19 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 | `GET /api/health` | liveness check |
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}` |
+| `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
+
+## Look and feel
+
+The UI follows the brainrotnt design system. Its tokens live in `apps/web/src/index.css` as CSS variables (surfaces, ink, the four state colours, radii, shadows) with Tailwind utilities for each, plus the type styles (`text-body`, `text-label`, `text-heading-sm`, and so on). Dark is the default; the light theme applies when your OS prefers it, or with `data-theme="light"` on `<html>`. shadcn's variable names (`--background`, `--primary`, ...) are mapped onto the same tokens, so components added with `shadcn add` pick up the theme.
+
+Agent state names are shown exactly as Luvus reports them (Idle, Working, Blocked, Done). Blocked is the only state that interrupts: it pins a banner to the top of the window.
 
 ## Checks
 
 ```sh
-bun run test                          # grading unit tests
+bun run test                          # grading unit tests and API route tests (temp database)
 cd apps/bridge && bunx tsc --noEmit   # typecheck the bridge
 cd apps/web && bun run build          # typecheck and build the UI
 ```

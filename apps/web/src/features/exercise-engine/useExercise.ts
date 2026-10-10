@@ -10,6 +10,7 @@ export interface Problem {
   statement: string;
   choices: string[] | null;
   unit: string | null;
+  tools: { calculator: "none" | "basic" | "scientific" | "stats"; draw: boolean };
 }
 
 export interface AttemptResult {
@@ -24,6 +25,7 @@ export function useExercise(subject: string, agentState: AgentState) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [flagged, setFlagged] = useState(false);
 
   const seen = useRef<string[]>([]);
   const latestLoad = useRef(0);
@@ -46,6 +48,7 @@ export function useExercise(subject: string, agentState: AgentState) {
     setPhase("loading");
     setResult(null);
     setMessage(null);
+    setFlagged(false);
     try {
       let res = await fetchProblem(seen.current);
       // Everything in this subject has been seen this session: start over.
@@ -113,5 +116,20 @@ export function useExercise(subject: string, agentState: AgentState) {
     [problem],
   );
 
-  return { problem, phase, result, message, submit, next: load };
+  const flag = useCallback(async () => {
+    if (!problem || flagged) return;
+    try {
+      const res = await fetch("/api/flags", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ problemId: problem.id }),
+      });
+      if (!res.ok) throw new Error(`bridge returned ${res.status}`);
+      setFlagged(true);
+    } catch {
+      setMessage("Could not flag this problem.");
+    }
+  }, [problem, flagged]);
+
+  return { problem, phase, result, message, flagged, submit, flag, next: load };
 }
