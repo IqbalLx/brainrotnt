@@ -4,7 +4,9 @@ export type AgentState = "idle" | "working" | "blocked" | "done";
 
 export interface AgentStateEvent {
   status: AgentState;
+  pane: string;
   agent: string;
+  project: string;
   cwd: string;
   branch: string | null;
   at: string;
