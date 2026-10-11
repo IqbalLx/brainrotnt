@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { grade, parseNumericInput } from "./grade";
+import { problemSpec, storedAnswer } from "../../content/problem-spec";
+import { codeSpec } from "../../test-support";
+import { grade, gradeAttempt, parseNumericInput } from "./grade";
 
 const numeric = (value: number, tolerance = 0.01, unit?: string) => ({ value, tolerance, unit });
 const correct = (r: ReturnType<typeof grade>) => r.status === "graded" && r.correct;
@@ -119,8 +121,67 @@ describe("symbolic grading", () => {
   });
 });
 
+describe("code grading", () => {
+  const stored = storedAnswer(problemSpec.parse(codeSpec()));
+  const submit = (language: string, code: string) => gradeAttempt("code", stored, { language, code });
+  const py = (body: string) => `def solve(numbers):\n${body.replace(/^/gm, "    ")}\n`;
+
+  test("a correct solution passes all tests in either language", async () => {
+    expect(await submit("python", py("return sum(n for n in numbers if n % 2 == 0)"))).toMatchObject({
+      status: "graded",
+      correct: true,
+      detail: "Passed 5 of 5 tests.",
+    });
+    const js = "function solve(numbers) { return numbers.filter((n) => n % 2 === 0).reduce((a, b) => a + b, 0); }";
+    expect(await submit("javascript", js)).toMatchObject({ status: "graded", correct: true });
+  });
+
+  test("a failing visible test is described with its input and expected value", async () => {
+    const result = await submit("python", py("return sum(numbers)"));
+    expect(result).toMatchObject({ status: "graded", correct: false });
+    expect(result.status === "graded" && result.detail).toBe("Passed 2 of 5 tests. First failure: solve([1,2,3,4]) returned 10, expected 6");
+  });
+
+  test("a failing hidden test shows the input and the output but never the expected value", async () => {
+    // Passes both visible tests, fails the first hidden one.
+    const result = await submit("python", py("return sum(n for n in numbers if n % 2 == 0) + (1 if numbers == [7, 9] else 0)"));
+    expect(result.status === "graded" && result.detail).toBe("Passed 4 of 5 tests. First failure: solve([7,9]) returned 1");
+  });
+
+  test("an exception is described rather than hidden", async () => {
+    const result = await submit("python", py("return numbers[10]"));
+    expect(result.status === "graded" && result.detail).toContain("raised IndexError");
+  });
+
+  test("an infinite loop is graded incorrect with a time limit message", async () => {
+    const result = await submit("python", py("while True: pass"));
+    expect(result).toMatchObject({ status: "graded", correct: false, detail: expect.stringContaining("Time limit exceeded") });
+  }, 15_000);
+
+  test("a failing answer reveals the reference solution for that language", async () => {
+    const result = await submit("javascript", "function solve(numbers) { return 0; }");
+    expect(result.status === "graded" && result.expected).toContain("reduce");
+  });
+
+  test("unrunnable or unusable submissions are invalid, not incorrect", async () => {
+    expect(await submit("python", "def solve(numbers)\n    return 1\n")).toMatchObject({ status: "invalid", message: expect.stringContaining("SyntaxError") });
+    expect(await submit("python", "x = 1\n")).toEqual({ status: "invalid", message: "Define a function named solve." });
+    expect(await submit("python", "   ")).toEqual({ status: "invalid", message: "Write some code first." });
+    expect(await submit("ruby", "puts 1")).toEqual({ status: "invalid", message: "Submit your code and pick a language." });
+    expect(await gradeAttempt("code", stored, "just text")).toEqual({ status: "invalid", message: "Submit your code and pick a language." });
+  });
+
+  test("a language the problem does not offer is invalid", async () => {
+    const pythonOnly = storedAnswer(problemSpec.parse({ ...codeSpec(), languages: { python: (codeSpec() as any).languages.python } }));
+    expect(await gradeAttempt("code", pythonOnly, { language: "javascript", code: "function solve() {}" })).toEqual({
+      status: "invalid",
+      message: "This problem is not available in javascript.",
+    });
+  });
+});
+
 describe("other types", () => {
-  test("code is not gradable yet", () => {
-    expect(grade("code", {}, "x")).toEqual({ status: "unsupported" });
+  test("unknown types are unsupported", () => {
+    expect(grade("essay", {}, "x")).toEqual({ status: "unsupported" });
   });
 });

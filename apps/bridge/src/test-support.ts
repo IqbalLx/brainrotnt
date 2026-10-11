@@ -90,3 +90,38 @@ export function symbolicSpec(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+// "Sum of the even numbers in a list", offered in both languages.
+export function codeSpec(overrides: Record<string, unknown> = {}) {
+  return {
+    subject: "code",
+    topic: "loops",
+    difficulty: 1,
+    type: "code",
+    statement: `Write solve(numbers) that returns the sum of the even numbers in a list of integers, in test case ${unique()}.`,
+    tools: { calculator: "none", draw: false },
+    answer: {
+      entry: "solve",
+      tests: [
+        { args: [[1, 2, 3, 4]], expected: 6 },
+        { args: [[]], expected: 0 },
+        { args: [[7, 9]], expected: 0, hidden: true },
+        { args: [[-2, 5, 10]], expected: 8, hidden: true },
+        { args: [[0, 0, 4]], expected: 4, hidden: true },
+      ],
+    },
+    languages: {
+      python: {
+        starter: "def solve(numbers):\n    # TODO\n    return None\n",
+        reference: "def solve(numbers):\n    return sum(n for n in numbers if n % 2 == 0)\n",
+        wrong: "def solve(numbers):\n    return sum(n for n in numbers if n % 2 == 0 and n > 0)\n",
+      },
+      javascript: {
+        starter: "function solve(numbers) {\n  // TODO\n}\n",
+        reference: "function solve(numbers) {\n  return numbers.filter((n) => n % 2 === 0).reduce((a, b) => a + b, 0);\n}\n",
+        wrong: "function solve(numbers) {\n  return numbers.filter((n) => n % 2 === 0 && n > 0).reduce((a, b) => a + b, 0);\n}\n",
+      },
+    },
+    ...overrides,
+  };
+}

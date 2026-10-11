@@ -1,5 +1,9 @@
 import { verifyKeyAgainstPoints } from "@brainrotnt/math-engine";
 import { statementHash } from "../content/hash";
+import { problemSpec, storedAnswer } from "../content/problem-spec";
+import { verifyReference } from "../content/verify-reference";
+import { getSandboxMode } from "../infra/sandbox-runner";
+import { CODE_SEEDS } from "./code-seeds";
 import { db } from "./client";
 import { mcqAnswer, numericAnswer, symbolicAnswer } from "./answer";
 import { problems } from "./schema";
@@ -190,7 +194,7 @@ function symbolicAnswerFor(seed: Seed) {
   return symbolicAnswer.parse({ expression, variables });
 }
 
-const rows = SEEDS.map((seed) => {
+const rows: (typeof problems.$inferInsert)[] = SEEDS.map((seed) => {
   const type: "mcq" | "numeric" | "symbolic" = seed.mcq ? "mcq" : seed.symbolic ? "symbolic" : "numeric";
   const answer = seed.mcq ? mcqAnswer.parse(seed.mcq) : seed.symbolic ? symbolicAnswerFor(seed) : numericAnswer.parse(seed.numeric);
   return {
@@ -209,6 +213,38 @@ const rows = SEEDS.map((seed) => {
     createdAt: new Date(),
   };
 });
+
+// Code problems are verified by running their solutions, which needs the sandbox; without it they are skipped.
+async function codeRows(): Promise<(typeof problems.$inferInsert)[]> {
+  if ((await getSandboxMode()) === "unavailable") {
+    console.warn("[seed] the sandbox is unavailable, so the programming problems were skipped (see the README).");
+    return [];
+  }
+  const out: (typeof problems.$inferInsert)[] = [];
+  for (const raw of CODE_SEEDS) {
+    const spec = problemSpec.parse(raw);
+    const verdict = await verifyReference(spec);
+    if (!verdict.ok) throw new Error(`seed ${raw.id}: ${verdict.error}`);
+    out.push({
+      id: raw.id,
+      version: 1,
+      subject: spec.subject,
+      topic: spec.topic,
+      difficulty: spec.difficulty,
+      type: spec.type,
+      statement: spec.statement,
+      tools: spec.tools,
+      answer: storedAnswer(spec),
+      verificationStatus: "verified",
+      source: null,
+      statementHash: statementHash(spec.statement, spec.topic),
+      createdAt: new Date(),
+    });
+  }
+  return out;
+}
+
+rows.push(...(await codeRows()));
 
 // Problems are immutable once verified, so existing ids are left untouched.
 const inserted = await db.insert(problems).values(rows).onConflictDoNothing().returning({ id: problems.id });

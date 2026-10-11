@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { expandTemplate } from "../../content/expand-template";
 import { generatedId, statementHash } from "../../content/hash";
-import { isTemplateItem, issuesOf, problemSpec, semanticIssues, templateSpec, type ProblemSpec } from "../../content/problem-spec";
+import { isTemplateItem, issuesOf, problemSpec, semanticIssues, storedAnswer, templateSpec, type ProblemSpec } from "../../content/problem-spec";
 import { verifyAll } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { problems } from "../../db/schema";
@@ -101,7 +101,7 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
             type: spec.type,
             statement: spec.statement,
             tools: spec.tools,
-            answer: spec.answer,
+            answer: storedAnswer(spec),
             verificationStatus: "verified",
             source: spec.source ?? null,
             statementHash: hash,

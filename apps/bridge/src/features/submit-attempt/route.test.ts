@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { attempts } from "../../db/schema";
-import { insertProblem, json, postJson, resetDb } from "../../test-support";
+import { codeSpec, insertProblem, json, postJson, resetDb } from "../../test-support";
+import { problemSpec, storedAnswer } from "../../content/problem-spec";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitAttemptRoute } from "./route";
 
-const attempt = (problemId: string, answer: string | number) => ({
+const attempt = (problemId: string, answer: unknown) => ({
   problemId,
   answer,
   secondsSpent: 4.5,
@@ -51,11 +52,6 @@ describe("POST /api/attempts", () => {
     expect((await submitAttemptRoute.request("/", postJson({ ...attempt("x", "1"), secondsSpent: -1 }))).status).toBe(400);
   });
 
-  test("code problems are not gradable yet", async () => {
-    const id = await insertProblem({ type: "code", answer: {} });
-    expect((await submitAttemptRoute.request("/", postJson(attempt(id, "x")))).status).toBe(422);
-  });
-
   test("symbolic answers: equivalent forms are correct, others are not, and unreadable ones are not recorded", async () => {
     const id = await insertProblem({ type: "symbolic", answer: { expression: "3*x^2 + 2", variables: ["x"], domain: [-5, 5] } });
 
@@ -94,12 +90,49 @@ describe("GET /api/problems/next", () => {
     expect(body).not.toHaveProperty("answer");
   });
 
-  test("exclude skips listed ids; code problems are never served", async () => {
-    const a = await insertProblem({ subject: "code", topic: "exclude-test", type: "code", answer: {} });
-    expect((await getNextProblemRoute.request("/?subject=code")).status).toBe(404);
+  test("exclude skips listed ids", async () => {
+    const a = await insertProblem({ subject: "stats", topic: "exclude-test" });
     const b = await insertProblem({ subject: "stats", topic: "exclude-test" });
-    const res = await getNextProblemRoute.request(`/?subject=stats&exclude=${b}`);
-    if (res.status === 200) expect((await json(res)).id).not.toBe(b);
-    expect(a).not.toBe(b);
+    for (let i = 0; i < 10; i++) {
+      expect((await json(await getNextProblemRoute.request(`/?subject=stats&exclude=${a}`))).id).toBe(b);
+    }
+    expect((await getNextProblemRoute.request(`/?subject=stats&exclude=${a},${b}`)).status).toBe(404);
+  });
+});
+
+describe("code problems", () => {
+  const python = (body: string) => ({ language: "python", code: `def solve(numbers):\n${body.replace(/^/gm, "    ")}\n` });
+  const insertCode = () =>
+    insertProblem({ subject: "code", type: "code", answer: storedAnswer(problemSpec.parse(codeSpec())) as object });
+
+  test("a correct submission is graded, recorded and returns the test summary", async () => {
+    const id = await insertCode();
+    const res = await submitAttemptRoute.request("/", postJson(attempt(id, python("return sum(n for n in numbers if n % 2 == 0)"))));
+    expect(res.status).toBe(200);
+    expect(await json(res)).toMatchObject({ correct: true, detail: "Passed 5 of 5 tests." });
+    const [row] = await db.select().from(attempts).where(eq(attempts.problemId, id));
+    expect(row.correct).toBe(true);
+    expect(row.answerGiven).toMatchObject({ language: "python" });
+  });
+
+  test("a wrong submission is recorded as incorrect with the first failing call", async () => {
+    const id = await insertCode();
+    const body = await json(await submitAttemptRoute.request("/", postJson(attempt(id, python("return sum(numbers)")))));
+    expect(body).toMatchObject({ correct: false, detail: expect.stringContaining("First failure: solve([1,2,3,4]) returned 10, expected 6") });
+    expect(await db.select().from(attempts).where(eq(attempts.problemId, id))).toHaveLength(1);
+  });
+
+  test("code that does not load is rejected without recording an attempt", async () => {
+    const id = await insertCode();
+    const res = await submitAttemptRoute.request("/", postJson(attempt(id, { language: "python", code: "def solve(" })));
+    expect(res.status).toBe(422);
+    expect(await json(res)).toMatchObject({ error: "invalid_answer", message: expect.stringContaining("SyntaxError") });
+    expect(await db.select().from(attempts)).toHaveLength(0);
+  });
+
+  test("oversized code and unknown languages are bad requests", async () => {
+    const id = await insertCode();
+    expect((await submitAttemptRoute.request("/", postJson(attempt(id, { language: "python", code: "x".repeat(20_001) })))).status).toBe(400);
+    expect((await submitAttemptRoute.request("/", postJson(attempt(id, { language: "cobol", code: "x" })))).status).toBe(400);
   });
 });

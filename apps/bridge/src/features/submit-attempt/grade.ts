@@ -1,8 +1,9 @@
 import { checkEquivalent } from "@brainrotnt/math-engine";
-import { mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
+import { describeTestFailure, runTests } from "../../content/run-tests";
+import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
 
 export type GradeResult =
-  | { status: "graded"; correct: boolean; expected: string }
+  | { status: "graded"; correct: boolean; expected: string; detail?: string }
   | { status: "invalid"; message: string }
   | { status: "unsupported" };
 
@@ -86,4 +87,41 @@ export function grade(type: string, stored: unknown, given: unknown): GradeResul
     default:
       return { status: "unsupported" };
   }
+}
+
+// What a student submits for a code problem.
+export type CodeSubmission = { language: (typeof CODE_LANGUAGES)[number]; code: string };
+
+// Code is run, so unlike the other types it grades asynchronously (and never inside the HTTP handler's sync path).
+export async function gradeCode(stored: unknown, given: unknown): Promise<GradeResult> {
+  const answer = codeAnswer.parse(stored);
+  const submission = given as Partial<CodeSubmission> | null;
+  if (typeof submission !== "object" || submission === null || typeof submission.code !== "string" || !CODE_LANGUAGES.includes(submission.language as never)) {
+    return { status: "invalid", message: "Submit your code and pick a language." };
+  }
+  const language = submission.language as CodeSubmission["language"];
+  const offered = answer.languages[language];
+  if (!offered) return { status: "invalid", message: `This problem is not available in ${language}.` };
+  if (submission.code.trim() === "") return { status: "invalid", message: "Write some code first." };
+
+  const report = await runTests(language, submission.code, answer);
+  if (report.status === "broken") return { status: "invalid", message: report.message };
+  if (report.status === "failed") {
+    if (report.reason === "timeout") {
+      return { status: "graded", correct: false, expected: offered.solution, detail: "Time limit exceeded: the code took too long, possibly an infinite loop." };
+    }
+    if (report.reason === "output_too_large") {
+      return { status: "graded", correct: false, expected: offered.solution, detail: "The code printed far too much output." };
+    }
+    return { status: "invalid", message: report.reason === "sandbox_unavailable" ? report.message : `The code could not be run: ${report.message}` };
+  }
+
+  const correct = report.passed === report.total;
+  const summary = `Passed ${report.passed} of ${report.total} tests.`;
+  const detail = report.firstFailure ? `${summary} First failure: ${describeTestFailure(answer.entry, report.firstFailure)}` : summary;
+  return { status: "graded", correct, expected: offered.solution, detail };
+}
+
+export function gradeAttempt(type: string, stored: unknown, given: unknown): Promise<GradeResult> {
+  return type === "code" ? gradeCode(stored, given) : Promise.resolve(grade(type, stored, given));
 }

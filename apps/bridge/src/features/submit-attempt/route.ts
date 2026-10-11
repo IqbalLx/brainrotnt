@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { grade } from "./grade";
+import { gradeAttempt } from "./grade";
 import { findProblemForGrading, recordAttempt } from "./query";
 import { submitAttemptBody } from "./schema";
 
@@ -15,7 +15,7 @@ submitAttemptRoute.post("/", async (c) => {
   const problem = await findProblemForGrading(parsed.data.problemId);
   if (!problem) return c.json({ error: "problem_not_found" }, 404);
 
-  const result = grade(problem.type, problem.answer, parsed.data.answer);
+  const result = await gradeAttempt(problem.type, problem.answer, parsed.data.answer);
   if (result.status === "unsupported") {
     return c.json({ error: "unsupported_problem_type" }, 422);
   }
@@ -24,5 +24,5 @@ submitAttemptRoute.post("/", async (c) => {
   }
 
   const attemptId = await recordAttempt(parsed.data, result.correct);
-  return c.json({ attemptId, correct: result.correct, expected: result.expected });
+  return c.json({ attemptId, correct: result.correct, expected: result.expected, detail: result.detail ?? null });
 });

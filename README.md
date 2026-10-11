@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Code problems are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Programming problems are graded by the bridge, but the editor in the browser is not built yet.
 
 ## Prerequisites
 
@@ -71,7 +71,7 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 - **Multiple choice:** the chosen option must be the correct one.
 - **Numeric:** the value must be within the problem's relative tolerance (absolute when the answer is 0). You can type `12.4`, `1.2e3` or a fraction like `5/36`. If the problem has a unit, you can omit it, but a wrong unit counts as incorrect.
 - **Symbolic:** type an expression such as `2x + 1`. Any equivalent form is accepted (`1 + 2x`, `(4x + 2)/2`), and only the variables the problem names are allowed. The bridge checks equivalence by evaluating your expression and the key at 40 deterministic sample points; it is a strong randomized test, not a proof. A key that cannot be evaluated at enough points of its domain is reported as broken rather than counted against you. Expressions run through the same restricted maths engine as the calculator (no assignments, no function definitions, no `evaluate`).
-- **Code** problems are not gradable yet, so they are never served.
+- **Code:** submit `{language, code}` (`python` or `javascript`). The bridge runs your code in the [sandbox](#sandbox-for-generated-code) against the problem's tests, calling the problem's function (usually `solve`) once per test with JSON arguments, and compares what it returns with the expected JSON value (numbers get 1e-9 relative slack, everything else must match exactly). Every test must pass. The visible tests are shown with the problem; the hidden ones are not, so a failure on a hidden test tells you the input and what you returned, never the expected value. A syntax error or a missing function is rejected without recording an attempt; an infinite loop (5 second limit) or an exception on a test counts as incorrect. After an attempt you are shown a reference solution.
 - Input that cannot be parsed (for example `banana`, or `y^2` when the problem uses `x`) is rejected without being recorded as an attempt.
 
 ## API
@@ -80,7 +80,7 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 |---|---|
 | `GET /api/health` | liveness check |
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
-| `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}` |
+| `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}`, where `answer` is a number, a string, an option index, or `{language, code}`; replies `{attemptId, correct, expected, detail}` |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
 | `GET /api/session-summary?since=<ISO time>` | attempts, correct, accuracy and a per-subject breakdown since that time |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
@@ -124,6 +124,8 @@ The server runs the generator in the sandbox for seeds 0 to 49 and accepts it on
 
 ### Importing from files
 
+**Programming problems** (`type: code`, `subject: code`) have no single answer to compute, so they are verified by their tests instead. A spec gives the function name (`entry`, default `solve`), the tests as JSON (`{args: [...], expected: ..., hidden?: true}`, at least 4, with at least one visible and two hidden), and for each offered language a `starter`, a correct `reference` and a deliberately `wrong` solution. For every language the server runs all three in the sandbox and accepts the problem only if the reference passes every test, the wrong solution still loads but fails at least one (which proves the tests can tell right from wrong), and the starter does not already pass. `problems/example.yaml` has one. Only the starter code and the visible tests are ever sent to the browser.
+
 The same validation, sandboxed verification and deduplication are available without MCP. Ask Claude Code to write a YAML file, or write one yourself, then:
 
 ```sh
@@ -138,9 +140,9 @@ The whole API, including `/mcp`, only answers requests addressed to `localhost`,
 
 ## Sandbox for generated code
 
-Problems added through the content pipeline carry Python code (reference solutions and generators) written by an AI agent, possibly from injected source material, so it is never trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
+Problems added through the content pipeline carry code (reference solutions and generators) written by an AI agent, possibly from injected source material, and students submit code of their own, so none of it is trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
 
-Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH.
+Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH. JavaScript is run by the Bun that runs the bridge, under the same limits.
 
 ## Drawing board
 

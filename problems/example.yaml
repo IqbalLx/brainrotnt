@@ -51,3 +51,45 @@ problems:
       code: |
         options = ["cos(x)", "-cos(x)", "-sin(x)", "tan(x)"]
         print(options.index("cos(x)"))
+
+  # A programming problem. Student code is run against the tests in the sandbox. Visible tests are shown
+  # as examples; hidden ones are not. For every language the server checks that the reference passes all
+  # tests, the deliberately wrong solution fails at least one, and the starter does not already pass.
+  - subject: code
+    topic: strings
+    difficulty: 1
+    type: code
+    statement: "Write solve(word) that returns the word reversed. For example solve(\"stressed\") is \"desserts\", and the empty string stays empty."
+    answer:
+      entry: solve
+      tests:
+        - { args: ["stressed"], expected: "desserts" }
+        - { args: [""], expected: "" }
+        - { args: ["a"], expected: "a", hidden: true }
+        - { args: ["abc"], expected: "cba", hidden: true }
+        - { args: ["Level up"], expected: "pu leveL", hidden: true }
+    languages:
+      python:
+        starter: |
+          def solve(word):
+              # return the word reversed
+              return None
+        reference: |
+          def solve(word):
+              return word[::-1]
+        wrong: |
+          def solve(word):
+              return word
+      javascript:
+        starter: |
+          function solve(word) {
+            // return the word reversed
+          }
+        reference: |
+          function solve(word) {
+            return [...word].reverse().join("");
+          }
+        wrong: |
+          function solve(word) {
+            return word;
+          }

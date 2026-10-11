@@ -1,6 +1,6 @@
 import { and, eq, ne } from "drizzle-orm";
 import { statementHash } from "../../content/hash";
-import { issuesOf, problemSpec, semanticIssues } from "../../content/problem-spec";
+import { issuesOf, problemSpec, semanticIssues, storedAnswer } from "../../content/problem-spec";
 import { verifyReference } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
@@ -49,7 +49,7 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
         type: spec.type,
         statement: spec.statement,
         tools: spec.tools,
-        answer: spec.answer,
+        answer: storedAnswer(spec),
         verificationStatus: "verified",
         source: spec.source ?? existing.source,
         statementHash: hash,
