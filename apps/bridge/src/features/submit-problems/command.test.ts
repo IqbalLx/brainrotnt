@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
-import { problems } from "../../db/schema";
+import { flags, problems } from "../../db/schema";
+import { listFlagged } from "../list-flagged/query";
 import { codeSpec, mcqSpec, numericSpec, resetDb, symbolicSpec } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitProblems } from "./command";
@@ -246,5 +247,45 @@ describe("code problems", () => {
 
   test("at least one language is required", async () => {
     expect((await errorsOf(codeSpec({ languages: {} }))).join(" ")).toContain("at least one language");
+  });
+});
+
+describe("hints", () => {
+  test("are stored with the problem", async () => {
+    const result = await submitProblems([numericSpec({ hints: ["Think of 6 sevens.", "Add 7 six times."] })]);
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(problems);
+    expect(row.hints).toEqual(["Think of 6 sevens.", "Add 7 six times."]);
+  });
+
+  test("a hint that contains the answer is rejected, for every type", async () => {
+    const numeric = await submitProblems([numericSpec({ hints: ["It is 42."] })]);
+    expect((numeric.results[0] as any).errors[0]).toContain("hints.0: contains the answer (42)");
+    const mcq = await submitProblems([mcqSpec({ hints: ["Not speed.", "It's velocity."] })]);
+    expect((mcq.results[0] as any).errors[0]).toContain("hints.1: names the correct option");
+    const symbolic = await submitProblems([symbolicSpec({ hints: ["The answer is 3x^2 + 2."] })]);
+    expect((symbolic.results[0] as any).errors[0]).toContain("contains the answer expression");
+  });
+
+  test("more than three hints, or empty ones, are rejected", async () => {
+    expect((await submitProblems([numericSpec({ hints: ["one hint", "two hint", "three hint", "four hint"] })])).inserted).toBe(0);
+    expect((await submitProblems([numericSpec({ hints: [""] })])).inserted).toBe(0);
+  });
+
+  test("code: a hint with a full solution is rejected; a third hint close to the reference is flagged for review", async () => {
+    const solution = "```python\ndef solve(numbers):\n    return sum(n for n in numbers if n % 2 == 0)\n```";
+    const rejected = await submitProblems([codeSpec({ hints: ["Even numbers only.", solution] })]);
+    expect((rejected.results[0] as any).errors[0]).toContain("complete python solution");
+
+    const close = "Something like: return sum(n for n in numbers if n % 2 == 0 ...) but check the details";
+    const result = await submitProblems([codeSpec({ hints: ["Even numbers only.", "Use % 2.", close] })]);
+    expect(result.inserted).toBe(1);
+    expect((result.results[0] as any).notes[0]).toContain("hint 3 shares most of its code with the python reference");
+
+    const [row] = await db.select().from(problems);
+    expect(row.verificationStatus).toBe("verified");
+    expect(await db.select().from(flags)).toHaveLength(1);
+    const listed = await listFlagged();
+    expect(listed).toEqual([expect.objectContaining({ id: row.id, inRotation: true, flags: [expect.objectContaining({ reason: expect.stringContaining("review:") })] })]);
   });
 });

@@ -89,6 +89,7 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `GET /api/sessions/current` | the open session with its current question, `404` when there is none |
 | `POST /api/sessions/:id/answer` | grade and record the current question: `{position, answer, secondsSpent, agentState}`; replies with the result, the credit and the updated session |
 | `POST /api/sessions/:id/skip` | resolve the current question with no credit: `{position}` |
+| `POST /api/sessions/:id/hints` | open the next hint of the current question: `{position}`; replies with the hints opened so far |
 | `POST /api/sessions/:id/end` | end the session early; unanswered questions earn nothing |
 | `GET /api/sessions/:id/score` | the score screen, once the session has ended |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
@@ -132,6 +133,8 @@ def generate(seed):
 The server runs the generator in the sandbox for seeds 0 to 49 and accepts it only if every seed works: no exceptions, the same output when called twice with the same seed, params covering every placeholder, a finite answer (or distinct options with a valid correct index for multiple choice), and enough distinct statements for the number of variants asked for. It then expands a fixed number of variants (1 to 50) into the bank as ordinary verified problems with ids like `<id>.s0`, `<id>.s1`, so answers are computed rather than recalled and nothing runs at serve time. A template goes in whole or not at all, and submitting the same one twice is refused.
 
 ### Importing from files
+
+**Hints.** Any problem can carry up to three `hints`, revealed one at a time in a session and never skipped ahead: the first nudges the concept, the second names the method, the third gives the exact formula or approach without the answer. Each hint opened takes a quarter point off a correct answer, and the app says so before it is opened. A hint is rejected if it contains the answer: a number within the key's tolerance, the correct option's text, the key expression, or, for code, a fenced block that passes every test. A third hint on a code problem that shares most of its tokens with a reference solution is accepted but listed by `list_flagged` as a review note (`inRotation: true`). In a template, hints may use the same `{placeholders}` and are checked against every variant.
 
 **Programming problems** (`type: code`, `subject: code`) have no single answer to compute, so they are verified by their tests instead. A spec gives the function name (`entry`, default `solve`), the tests as JSON (`{args: [...], expected: ..., hidden?: true}`, at least 4, with at least one visible and two hidden), and for each offered language a `starter`, a correct `reference` and a deliberately `wrong` solution. For every language the server runs all three in the sandbox and accepts the problem only if the reference passes every test, the wrong solution still loads but fails at least one (which proves the tests can tell right from wrong), and the starter does not already pass. `problems/example.yaml` has one. Only the starter code and the visible tests are ever sent to the browser.
 

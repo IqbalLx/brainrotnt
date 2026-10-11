@@ -4,12 +4,12 @@ import { generatedId, statementHash } from "../../content/hash";
 import { isTemplateItem, issuesOf, problemSpec, semanticIssues, storedAnswer, templateSpec, type ProblemSpec } from "../../content/problem-spec";
 import { verifyAll } from "../../content/verify-reference";
 import { db } from "../../db/client";
-import { problems } from "../../db/schema";
+import { flags, problems } from "../../db/schema";
 
 export const MAX_BATCH = 25;
 
 export type ItemResult =
-  | { index: number; status: "inserted"; id: string; ids?: string[] }
+  | { index: number; status: "inserted"; id: string; ids?: string[]; notes?: string[] }
   | { index: number; status: "rejected"; errors: string[] };
 
 export interface SubmitResult {
@@ -80,17 +80,17 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
   }
 
   const verdicts = await verifyAll(fresh.map((c) => c.spec));
-  const accepted: Candidate[] = [];
+  const accepted: (Candidate & { notes: string[] })[] = [];
   fresh.forEach((candidate, i) => {
     const verdict = verdicts[i];
-    if (verdict.ok) accepted.push(candidate);
+    if (verdict.ok) accepted.push({ ...candidate, notes: verdict.notes });
     else reject(candidate.index, [verdict.error]);
   });
 
   if (accepted.length) {
     const now = new Date();
     db.transaction((tx) => {
-      for (const { spec, hash, id } of accepted) {
+      for (const { spec, hash, id, notes } of accepted) {
         tx.insert(problems)
           .values({
             id,
@@ -102,15 +102,20 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
             statement: spec.statement,
             tools: spec.tools,
             answer: storedAnswer(spec),
+            hints: spec.hints ?? null,
             verificationStatus: "verified",
             source: spec.source ?? null,
             statementHash: hash,
             createdAt: now,
           })
           .run();
+        // Review notes leave the problem in rotation but list it for a person (or agent) to look at.
+        for (const reason of notes) {
+          tx.insert(flags).values({ id: crypto.randomUUID(), problemId: id, reason, resolved: false, createdAt: now }).run();
+        }
       }
     });
-    for (const { index, id } of accepted) results[index] = { index, status: "inserted", id };
+    for (const { index, id, notes } of accepted) results[index] = { index, status: "inserted", id, ...(notes.length ? { notes } : {}) };
   }
 
   let problemsAdded = accepted.length;
@@ -164,6 +169,7 @@ async function submitTemplate(raw: unknown): Promise<{ ok: true; baseId: string;
           statement: variant.statement,
           tools: spec.tools,
           answer: variant.answer,
+          hints: variant.hints ?? null,
           verificationStatus: "verified",
           source: spec.source ?? null,
           statementHash: variant.hash,

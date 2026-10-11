@@ -5,7 +5,7 @@ import { verifyReference } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
 
-export type UpdateResult = { ok: true; id: string; version: number; retired: string } | { ok: false; errors: string[] };
+export type UpdateResult = { ok: true; id: string; version: number; retired: string; notes?: string[] } | { ok: false; errors: string[] };
 
 // A verified problem is immutable. A repair inserts the next version and retires the old one, so
 // earlier attempts keep pointing at exactly what the person answered.
@@ -50,6 +50,7 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
         statement: spec.statement,
         tools: spec.tools,
         answer: storedAnswer(spec),
+        hints: spec.hints ?? null,
         verificationStatus: "verified",
         source: spec.source ?? existing.source,
         statementHash: hash,
@@ -58,8 +59,11 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
       .run();
     tx.update(problems).set({ verificationStatus: "retired" }).where(eq(problems.id, id)).run();
     tx.update(flags).set({ resolved: true }).where(eq(flags.problemId, id)).run();
+    for (const reason of verdict.notes) {
+      tx.insert(flags).values({ id: crypto.randomUUID(), problemId: newId, reason, resolved: false, createdAt: new Date() }).run();
+    }
   });
 
-  return { ok: true, id: newId, version, retired: id };
+  return { ok: true, id: newId, version, retired: id, ...(verdict.notes.length ? { notes: verdict.notes } : {}) };
 }
 

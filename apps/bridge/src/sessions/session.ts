@@ -25,7 +25,7 @@ export interface SessionView {
   /** Position of the question being answered, or null once every question is resolved or the session ended. */
   position: number | null;
   items: { position: number; outcome: ItemRow["outcome"]; credit: number | null }[];
-  current: (ProblemView & { hintsRevealed: number }) | null;
+  current: (ProblemView & { hintsRevealed: number; hintCount: number; hints: string[] }) | null;
 }
 
 const problemColumns = {
@@ -63,8 +63,10 @@ export async function sessionView(session: SessionRow): Promise<SessionView> {
   const item = currentItem(session, items);
   let current: SessionView["current"] = null;
   if (item) {
-    const [row] = await db.select(problemColumns).from(problems).where(eq(problems.id, item.problemId));
-    current = { ...toProblemView(row), hintsRevealed: item.hintsRevealed };
+    const [row] = await db.select({ ...problemColumns, hints: problems.hints }).from(problems).where(eq(problems.id, item.problemId));
+    const { hints, ...problem } = row;
+    // Only the hints already opened leave the server.
+    current = { ...toProblemView(problem), hintsRevealed: item.hintsRevealed, hintCount: hints?.length ?? 0, hints: (hints ?? []).slice(0, item.hintsRevealed) };
   }
   return {
     id: session.id,
