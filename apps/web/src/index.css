@@ -1,78 +1,105 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/jetbrains-mono";
 
 /*
- * brainrotnt design tokens. Source of truth: the Claude Design system's tokens.json.
- * Dark is the first theme; light applies when the OS prefers it, or via data-theme="light".
+ * brainrotnt design tokens: "Obsidian Kinetic" (the Google Stitch design system), with a light variant
+ * derived from it. Dark is the default; light applies when the OS prefers it, or via data-theme="light".
+ * Fonts are bundled, never fetched from a CDN, so the app works offline.
  */
 :root {
   color-scheme: dark;
-
-  --surface: #10151b;
-  --surface-raised: #182029;
-  --surface-sunken: #0b0f14;
-  --border: #2a3440;
-  --ink: #eef3f7;
-  --ink-muted: #96a4b1;
-  --ink-faint: #5b6773;
-  --brand: #5b9dff;
-  --on-brand: #0b1424;
-  --blocked: #ffb454;
-  --on-blocked: #241300;
-  --success: #4ade80;
-  --on-success: #06220f;
-  --danger: #ff8585;
-  --on-danger: #2a0a0a;
-  --focus-ring: var(--brand);
-
-  --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --ds-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --surface: #0e141d;
+  --surface-raised: #161c25;
+  --surface-sunken: #080e17;
+  --surface-high: #242a34;
+  --border: #262f3b;
+  --border-strong: #3b4d63;
+  --ink: #dde2f0;
+  --ink-muted: #aab2c3;
+  --ink-faint: #6f7889;
+  --brand: #a078ff;
+  --on-brand: #1f0052;
+  --brand-ink: #d0bcff;
+  --info: #4cd7f6;
+  --on-info: #003640;
+  --blocked: #fbbf24;
+  --on-blocked: #2a1a00;
+  --success: #4edea3;
+  --on-success: #003824;
+  --danger: #ffb4ab;
+  --on-danger: #690005;
+  --subject-math: #818cf8;
+  --subject-stats: #2dd4bf;
+  --subject-physics: #38bdf8;
+  --subject-code: #34d399;
+  --subject-trivia: #fbbf24;
+  --focus-ring: var(--info);
+  --ds-shadow-sm: none;
+  --ds-shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-
-  --surface: #f7f8fa;
+  --surface: #f6f7fb;
   --surface-raised: #ffffff;
-  --surface-sunken: #eef0f3;
-  --border: #d8dee5;
-  --ink: #171c22;
-  --ink-muted: #5b6673;
-  --ink-faint: #99a3ad;
-  --brand: #1d4ed8;
+  --surface-sunken: #eef1f6;
+  --surface-high: #e3e7ef;
+  --border: #d9dee8;
+  --border-strong: #b8c1d0;
+  --ink: #141a24;
+  --ink-muted: #4c5566;
+  --ink-faint: #8a93a3;
+  --brand: #6d3bd7;
   --on-brand: #ffffff;
-  --blocked: #c2410c;
+  --brand-ink: #5516be;
+  --info: #0e7490;
+  --on-info: #ffffff;
+  --blocked: #b45309;
   --on-blocked: #ffffff;
-  --success: #15803d;
+  --success: #047857;
   --on-success: #ffffff;
-  --danger: #dc2626;
+  --danger: #b91c1c;
   --on-danger: #ffffff;
-
-  --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
-  --ds-shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --subject-math: #4f46e5;
+  --subject-stats: #0f766e;
+  --subject-physics: #0369a1;
+  --subject-code: #047857;
+  --subject-trivia: #b45309;
+  --ds-shadow-sm: none;
+  --ds-shadow-md: 0 8px 24px -4px rgba(15, 23, 42, 0.14);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-
-    --surface: #f7f8fa;
+    --surface: #f6f7fb;
     --surface-raised: #ffffff;
-    --surface-sunken: #eef0f3;
-    --border: #d8dee5;
-    --ink: #171c22;
-    --ink-muted: #5b6673;
-    --ink-faint: #99a3ad;
-    --brand: #1d4ed8;
+    --surface-sunken: #eef1f6;
+    --surface-high: #e3e7ef;
+    --border: #d9dee8;
+    --border-strong: #b8c1d0;
+    --ink: #141a24;
+    --ink-muted: #4c5566;
+    --ink-faint: #8a93a3;
+    --brand: #6d3bd7;
     --on-brand: #ffffff;
-    --blocked: #c2410c;
+    --brand-ink: #5516be;
+    --info: #0e7490;
+    --on-info: #ffffff;
+    --blocked: #b45309;
     --on-blocked: #ffffff;
-    --success: #15803d;
+    --success: #047857;
     --on-success: #ffffff;
-    --danger: #dc2626;
+    --danger: #b91c1c;
     --on-danger: #ffffff;
-
-    --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
-    --ds-shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --subject-math: #4f46e5;
+    --subject-stats: #0f766e;
+    --subject-physics: #0369a1;
+    --subject-code: #047857;
+    --subject-trivia: #b45309;
+    --ds-shadow-sm: none;
+    --ds-shadow-md: 0 8px 24px -4px rgba(15, 23, 42, 0.14);
   }
 }
 
@@ -84,11 +111,11 @@
   --card-foreground: var(--ink);
   --primary: var(--brand);
   --primary-foreground: var(--on-brand);
-  --secondary: var(--surface-sunken);
+  --secondary: var(--surface-high);
   --secondary-foreground: var(--ink);
   --muted: var(--surface-sunken);
   --muted-foreground: var(--ink-muted);
-  --accent: var(--surface-sunken);
+  --accent: var(--surface-high);
   --accent-foreground: var(--ink);
   --destructive: var(--danger);
   --input: var(--border);
@@ -99,18 +126,28 @@
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
+  --color-surface-high: var(--surface-high);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
   --color-brand: var(--brand);
   --color-on-brand: var(--on-brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-info: var(--info);
+  --color-on-info: var(--on-info);
   --color-blocked: var(--blocked);
   --color-on-blocked: var(--on-blocked);
   --color-success: var(--success);
   --color-on-success: var(--on-success);
   --color-danger: var(--danger);
   --color-on-danger: var(--on-danger);
+  --color-subject-math: var(--subject-math);
+  --color-subject-stats: var(--subject-stats);
+  --color-subject-physics: var(--subject-physics);
+  --color-subject-code: var(--subject-code);
+  --color-subject-trivia: var(--subject-trivia);
   --color-focus-ring: var(--focus-ring);
 
   --color-background: var(--background);
@@ -134,53 +171,66 @@
 }
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Code", monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  /* Controlled, technical corners: 4px controls, 8px panels; pills only for status and tags. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
   --radius-lg: 8px;
   --radius-xl: 12px;
 }
 
-/* Type styles from the design system. Set badge and chip text in caps in markup. */
+/* Type scale. Geist for reading, JetBrains Mono for numbers, labels, code and status. */
 @utility text-display-lg {
   font-family: var(--font-mono);
-  font-size: 40px;
-  line-height: 44px;
-  font-weight: 700;
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 @utility text-display-sm {
   font-family: var(--font-mono);
   font-size: 24px;
-  line-height: 30px;
-  font-weight: 700;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 @utility text-heading-lg {
-  font-size: 20px;
-  line-height: 26px;
+  font-size: 24px;
+  line-height: 32px;
   font-weight: 600;
+  letter-spacing: -0.015em;
 }
 @utility text-heading-sm {
-  font-size: 15px;
-  line-height: 20px;
-  font-weight: 600;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 @utility text-body {
-  font-size: 15px;
-  line-height: 22px;
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 400;
 }
 @utility text-body-sm {
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 400;
 }
+@utility text-caption {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+/* Monospace caps for badges, tabs and section labels; set the caps in markup. */
 @utility text-label {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   line-height: 14px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 @utility text-code {
   font-family: var(--font-mono);
@@ -188,12 +238,23 @@
   line-height: 20px;
   font-weight: 400;
 }
+@utility text-code-lg {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
 
 @layer base {
   * {
     @apply border-border outline-focus-ring;
   }
   body {
-    @apply bg-surface text-body text-ink;
+    @apply bg-surface font-sans text-body text-ink antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 35%, transparent);
   }
 }

@@ -30,6 +30,11 @@ describe("sandbox runner", () => {
     expect(performance.now() - started).toBeLessThan(2500);
   });
 
+  test("the CPU backstop firing first still reads as a timeout, not a crash", async () => {
+    const result = await run("while True: pass", { timeoutMs: 10_000, cpuSeconds: 1 });
+    expect(result).toMatchObject({ ok: false, reason: "timeout" });
+  });
+
   test("runaway output is cut off", async () => {
     const result = await run("while True: print('x' * 1000)", { maxOutputBytes: 10_000 });
     expect(result).toMatchObject({ ok: false, reason: "output_too_large" });

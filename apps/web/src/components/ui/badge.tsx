@@ -2,15 +2,17 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("inline-flex items-center gap-2 rounded-full px-3 py-1 text-label uppercase", {
+// Status and tag pills: monospace caps on a tinted fill, so they read as markers, not buttons.
+const badgeVariants = cva("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-label uppercase", {
   variants: {
     variant: {
-      brand: "bg-brand text-on-brand",
-      muted: "bg-surface-sunken text-ink-muted",
-      ink: "bg-surface-sunken text-ink",
-      success: "bg-success text-on-success",
-      blocked: "bg-blocked text-on-blocked",
-      danger: "bg-danger text-on-danger",
+      brand: "border-brand/40 bg-brand/15 text-brand-ink",
+      info: "border-info/40 bg-info/10 text-info",
+      muted: "border-border bg-surface-sunken text-ink-muted",
+      ink: "border-border bg-surface-high text-ink",
+      success: "border-success/40 bg-success/10 text-success",
+      blocked: "border-blocked/40 bg-blocked/10 text-blocked",
+      danger: "border-danger/40 bg-danger/10 text-danger",
     },
   },
   defaultVariants: { variant: "muted" },
