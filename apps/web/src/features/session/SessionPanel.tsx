@@ -89,6 +89,10 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
         onNext={session.next}
         onSkip={session.skip}
         nextLabel={last ? "See your score" : "Next question"}
+        hints={view.current.hints}
+        hintCount={view.current.hintCount}
+        openingHint={session.revealing}
+        onOpenHint={session.revealHint}
       />
     </div>
   );
