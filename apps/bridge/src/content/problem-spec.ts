@@ -3,6 +3,7 @@ import { codeAnswer, codeTest, mcqAnswer, numericAnswer, symbolicAnswer } from "
 import { ENTRY_PATTERN } from "../infra/code-runner";
 import { explanationSpec } from "./explanation";
 import { hintsSpec } from "./hints";
+import { stabilityIssues, triviaSources } from "./trivia";
 
 const common = {
   id: z
@@ -122,7 +123,41 @@ export const problemSpec = z.discriminatedUnion("type", [
   }),
 ]);
 
-export type ProblemSpec = z.infer<typeof problemSpec>;
+// Trivia cannot be checked by code, so it carries sources instead of a reference solution.
+const triviaBase = {
+  ...common,
+  subject: z.literal("trivia"),
+  topic: common.topic.describe("history, geography, science or culture (art, music, film, literature, food, sport), or another free-form topic."),
+  tools: z
+    .object({ calculator: z.literal("none").default("none"), draw: z.literal(false).default(false) })
+    .default({})
+    .describe("Trivia has no calculator and no drawing board."),
+  statement: fixed.statement.describe(
+    "A stable fact: a date, a border as of a stated year, who did what. Words like current, today, latest or still are rejected unless the statement pins a year.",
+  ),
+  sources: triviaSources,
+};
+
+export const triviaSpec = z.discriminatedUnion("type", [
+  z.object({ ...triviaBase, type: z.literal("mcq"), answer: mcqAnswer.describe("options (2 to 8 strings) and the 0-based index of the correct one.") }),
+  z.object({
+    ...triviaBase,
+    type: z.literal("numeric"),
+    answer: numericAnswer
+      .extend({ tolerance: z.number().min(0).default(0) })
+      .describe("value (a year or a count), a relative tolerance (default 0, exact; keep it 0 for a year) and an optional unit."),
+  }),
+]);
+
+export type StemSpec = z.infer<typeof problemSpec>;
+export type TriviaSpec = z.infer<typeof triviaSpec>;
+export type ProblemSpec = StemSpec | TriviaSpec;
+
+/** Trivia and STEM problems have different shapes, told apart by subject. */
+export function parseProblemSpec(raw: unknown) {
+  const trivia = typeof raw === "object" && raw !== null && (raw as { subject?: unknown }).subject === "trivia";
+  return trivia ? triviaSpec.safeParse(raw) : problemSpec.safeParse(raw);
+}
 
 export function issuesOf(error: z.ZodError): string[] {
   return error.issues.map((issue) => `${issue.path.length ? issue.path.join(".") : "problem"}: ${issue.message}`);
@@ -130,6 +165,11 @@ export function issuesOf(error: z.ZodError): string[] {
 
 // Things the schema cannot express.
 export function semanticIssues(spec: ProblemSpec): string[] {
+  const stability = spec.subject === "trivia" ? stabilityIssues(spec.statement) : [];
+  return [...stability, ...shapeIssues(spec)];
+}
+
+function shapeIssues(spec: ProblemSpec): string[] {
   if (spec.type === "code") {
     const issues: string[] = [];
     if (!Object.values(spec.languages).some(Boolean)) issues.push("languages: offer at least one language");

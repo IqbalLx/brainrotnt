@@ -14,7 +14,8 @@ describe("getSchema", () => {
     expect(Object.keys(schema.templateSpec as object)).toContain("anyOf");
     expect(JSON.stringify(schema.templateSpec)).toContain("random.Random(seed)");
     expect(schema.supported.types).toEqual(["mcq", "numeric", "symbolic", "code"]);
-    expect(schema.supported.subjects).toEqual(["math", "stats", "physics", "code"]);
+    expect(schema.supported.subjects).toEqual(["math", "stats", "physics", "code", "trivia"]);
+    expect(Object.keys(schema.triviaSpec as object)).toContain("anyOf");
     expect(schema.limits.maxProblemsPerSubmit).toBe(25);
   });
 });

@@ -70,7 +70,7 @@ describe("parseStoredSettings", () => {
     expect(parseStoredSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings("not json")).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ ...valid, subjects: [] }))).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ ...valid, subjects: ["history"] }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, subjects: ["astrology"] }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ ...valid, minDifficulty: 4, maxDifficulty: 2 }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ ...valid, minDifficulty: 0, maxDifficulty: 9 }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ ...valid, calculator: "graphing" }))).toEqual(DEFAULT_SETTINGS);
@@ -84,7 +84,9 @@ describe("toggleSubject", () => {
     expect(toggleSubject(["physics"], "physics")).toEqual(["physics"]);
   });
 
-  test("STEM is the default", () => {
+  test("STEM is the default; trivia is opt-in", () => {
     expect(DEFAULT_SETTINGS.subjects).toEqual(["math", "stats", "physics", "code"]);
+    expect(toggleSubject(DEFAULT_SETTINGS.subjects, "trivia")).toEqual(["math", "stats", "physics", "code", "trivia"]);
+    expect(toggleSubject(["trivia"], "trivia")).toEqual(["trivia"]);
   });
 });
