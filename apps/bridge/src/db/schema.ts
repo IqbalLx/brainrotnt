@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const problems = sqliteTable("problems", {
   id: text("id").primaryKey(),
@@ -33,7 +33,44 @@ export const attempts = sqliteTable("attempts", {
     enum: ["idle", "working", "blocked", "done"],
   }).notNull(),
   timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  // Null for attempts made outside a session (v1).
+  sessionId: text("session_id").references(() => sessions.id),
+  hintsUsed: integer("hints_used").notNull().default(0),
 });
+
+// A session is a fixed set of questions, chosen when it starts.
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  subjects: text("subjects", { mode: "json" }).$type<string[]>().notNull(),
+  minDifficulty: integer("min_difficulty").notNull(),
+  maxDifficulty: integer("max_difficulty").notNull(),
+  size: integer("size").notNull(),
+  startedBy: text("started_by", { enum: ["agent", "manual"] }).notNull(),
+  startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
+  endedAt: integer("ended_at", { mode: "timestamp" }),
+  endReason: text("end_reason", { enum: ["completed", "ended_early", "abandoned"] }),
+  // Sum of the credit of every question; set when the session ends.
+  score: real("score"),
+});
+
+export const sessionItems = sqliteTable(
+  "session_items",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    position: integer("position").notNull(),
+    problemId: text("problem_id")
+      .notNull()
+      .references(() => problems.id),
+    hintsRevealed: integer("hints_revealed").notNull().default(0),
+    outcome: text("outcome", { enum: ["answered", "skipped"] }),
+    attemptId: text("attempt_id").references(() => attempts.id),
+    credit: real("credit"),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  },
+  (t) => [primaryKey({ columns: [t.sessionId, t.position] })],
+);
 
 export const flags = sqliteTable("flags", {
   id: text("id").primaryKey(),
