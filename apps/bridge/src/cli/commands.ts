@@ -6,6 +6,7 @@ import { DEFAULT_PORT } from "./args";
 import { findRunning } from "./lock";
 import { claudeSkillDir, INSTALL_URL, luvusSocket, type Paths } from "./paths";
 import { acceptsConnections } from "./ports";
+import { APPARMOR_PROFILE, appArmorProfileInstalled } from "./sandbox-setup";
 import { removePathBlock } from "./shell-path";
 import { bold, confirm, dim, fail, ok, run, warn } from "./ui";
 
@@ -159,6 +160,7 @@ export async function uninstall(paths: Paths, { purge, yes }: { purge: boolean; 
       `  ${ok(`Removed ${purge ? paths.home : paths.bin}`)}`,
       ...edited.map((file) => `  ${ok(`Removed the PATH line from ${file}`)}`),
       purge ? "" : `  ${dim(`Your data is still in ${paths.data}; delete that folder to remove it too.`)}`,
+      appArmorProfileInstalled() ? `  ${dim(`The sandbox's AppArmor profile is still in place: sudo apparmor_parser -R ${APPARMOR_PROFILE} && sudo rm ${APPARMOR_PROFILE}`)}` : "",
       Bun.which("claude") ? `  ${dim("Claude Code still lists the brainrotnt MCP server: claude mcp remove brainrotnt -s user")}` : "",
       ``,
     ]

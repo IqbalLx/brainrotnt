@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseArgs } from "./args";
 import { lanAddresses } from "./network";
+import { appArmorProfile } from "./sandbox-setup";
 import { PATH_BEGIN, PATH_END, removePathBlock } from "./shell-path";
 
 describe("parseArgs", () => {
@@ -22,11 +23,14 @@ describe("parseArgs", () => {
     expect(parseArgs(["--allow-remote-code"])).toMatchObject({ name: "error" });
     expect(parseArgs(["--netwrok"])).toMatchObject({ name: "error" });
     expect(parseArgs(["setup"])).toMatchObject({ name: "error" });
+    expect(parseArgs(["setup", "sandbox", "--force"])).toMatchObject({ name: "error" });
   });
 
   test("subcommands", () => {
     expect(parseArgs(["doctor"])).toEqual({ name: "doctor" });
     expect(parseArgs(["setup", "claude"])).toEqual({ name: "setup-claude" });
+    expect(parseArgs(["setup", "sandbox"])).toEqual({ name: "setup-sandbox", check: false });
+    expect(parseArgs(["setup", "sandbox", "--check"])).toEqual({ name: "setup-sandbox", check: true });
     expect(parseArgs(["update"])).toEqual({ name: "update", force: false });
     expect(parseArgs(["update", "--force"])).toEqual({ name: "update", force: true });
     expect(parseArgs(["uninstall", "--purge", "-y"])).toEqual({ name: "uninstall", purge: true, yes: true });
@@ -67,5 +71,13 @@ describe("removePathBlock", () => {
   test("leaves a file without the block unchanged", () => {
     const rc = "export EDITOR=vim\n";
     expect(removePathBlock(rc)).toBe(rc);
+  });
+});
+
+describe("appArmorProfile", () => {
+  test("allows user namespaces for exactly the given binary, quoted", () => {
+    const profile = appArmorProfile("/home/a b/.brainrotnt/bin/brainrotnt");
+    expect(profile).toContain('profile brainrotnt "/home/a b/.brainrotnt/bin/brainrotnt" flags=(unconfined) {');
+    expect(profile).toContain("  userns,");
   });
 });

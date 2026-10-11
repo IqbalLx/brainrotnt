@@ -34,9 +34,11 @@ Then open a new terminal and run `brnt` (or `brainrotnt`). It prints a link and 
 - **Your data stays put.** Everything lives in `~/.brainrotnt`: the program in `bin/`, your problems and sessions in `data/`. On the first start it creates the database and loads the starter problems. It finds Luvus by itself (`$LUVUS_SOCKET_PATH`, else `~/.luvus/luvus.sock`) and waits for it if it is not running.
 - **Updating** is running the install command again, or `brnt update`. Only `bin/` is replaced. Before a new version changes the database, the app copies it to `data/backups/` (the last 3 are kept), so an update can never lose your progress.
 - **On your phone or another computer:** `brnt --network` also serves on your local network and prints a link with an access key, plus a QR code. Other devices need that link (the key changes on every start). MCP and the debug endpoints stay reachable from your own computer only, and code answers and test runs from other devices are refused unless you add `--allow-remote-code`, because they run on your machine.
-- `brnt doctor` checks the installation, Python, the sandbox, Luvus and Claude Code. `brnt setup claude` registers the MCP server with Claude Code for all projects and installs the problem-writing skill (the installer offers this the first time). `brnt uninstall` removes the app and its PATH line and keeps your data (`--purge` deletes that too).
+- `brnt doctor` checks the installation, Python, the sandbox, Luvus and Claude Code, and says when AppArmor is what blocks the sandbox. `brnt setup sandbox` fixes that (see below). `brnt setup claude` registers the MCP server with Claude Code for all projects and installs the problem-writing skill (the installer offers this the first time). `brnt uninstall` removes the app and its PATH line and keeps your data (`--purge` deletes that too).
 
 The installer verifies the download against the release checksums, installs into `~/.brainrotnt/bin` without `sudo`, and adds that folder to PATH in your shell's startup file (one marked block; set `BRAINROTNT_NO_MODIFY_PATH=1` to skip). `BRAINROTNT_VERSION=v0.3.0` installs a specific release. Python 3 is needed to check Python code answers and new problems.
+
+**On Ubuntu 23.10 and later (and other Linux with the same AppArmor setting), the installer asks for `sudo` once.** AppArmor there blocks the unprivileged user namespace the [sandbox](#sandbox-for-generated-code) uses to cut code off the network, so the installer runs `brnt setup sandbox`, which writes an AppArmor profile, `/etc/apparmor.d/brainrotnt`, allowing it for the brainrotnt binary only. Nothing else on your system changes. Where the sandbox already works, or on macOS, nothing is asked. Set `BRAINROTNT_NO_SANDBOX_SETUP=1` to skip it, and run `brnt setup sandbox` later if you change your mind.
 
 ## Develop
 
@@ -220,7 +222,22 @@ The whole API, including `/mcp`, only answers requests addressed to `localhost`,
 
 Problems added through the content pipeline carry code (reference solutions and generators) written by an AI agent, possibly from injected source material, and students submit code of their own, so none of it is trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
 
-Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH. JavaScript is run by the Bun that runs the bridge, under the same limits.
+Where that isolation is unavailable (macOS, Windows, a Linux without user namespaces, or one where AppArmor blocks them) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH. JavaScript is run by the Bun that runs the bridge, under the same limits.
+
+**Ubuntu 23.10 and later** set `kernel.apparmor_restrict_unprivileged_userns=1`, which denies user namespaces to any program without an AppArmor profile that allows them, so `unshare -rn` fails with `write failed /proc/self/uid_map: Operation not permitted`. `brnt doctor` names this case (the startup screen points you there). `brnt setup sandbox` (run by the installer) fixes it for brainrotnt alone, the way Ubuntu does for Chrome and VS Code: it asks for `sudo`, writes this profile to `/etc/apparmor.d/brainrotnt`, loads it, and checks the sandbox from a fresh process:
+
+```
+abi <abi/4.0>,
+include <tunables/global>
+
+profile brainrotnt "/home/you/.brainrotnt/bin/brainrotnt" flags=(unconfined) {
+  userns,
+
+  include if exists <local/brainrotnt>
+}
+```
+
+The `unshare` that brainrotnt starts inherits the profile; other programs are still restricted. It names the installed binary, so it keeps working across updates, but a new `BRAINROTNT_HOME` needs `brnt setup sandbox` again. It cannot be done from source, where the binary is Bun itself and a profile would let every Bun program through. To undo it, `sudo apparmor_parser -R /etc/apparmor.d/brainrotnt && sudo rm /etc/apparmor.d/brainrotnt` (`brnt uninstall` reminds you). Turning the setting off system-wide (`sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0`) also works, but lifts the restriction for every program.
 
 ## Code editor
 

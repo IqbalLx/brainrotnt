@@ -7,11 +7,16 @@
 # sessions and backups in ~/.brainrotnt/data are never touched. The app backs the database up itself
 # before an update changes it.
 #
+# On Linux, where AppArmor blocks the user namespace the code sandbox needs (Ubuntu 23.10 and later), it
+# also runs `brnt setup sandbox`, which asks for sudo once to add an AppArmor profile that allows it for
+# the brainrotnt binary only (/etc/apparmor.d/brainrotnt). Nothing else is installed outside this folder.
+#
 # Overrides:
 #   BRAINROTNT_VERSION=v0.3.0        install that release (default: the latest)
 #   BRAINROTNT_HOME=...              install somewhere else (default: ~/.brainrotnt)
 #   BRAINROTNT_NO_MODIFY_PATH=1      do not add brainrotnt to PATH in your shell's startup file
 #   BRAINROTNT_FORCE=1               reinstall even if this version is already installed
+#   BRAINROTNT_NO_SANDBOX_SETUP=1    do not add the AppArmor profile (see brnt setup sandbox)
 set -eu
 
 REPO="IqbalLx/brainrotnt"
@@ -145,6 +150,11 @@ if [ -z "${BRAINROTNT_NO_MODIFY_PATH:-}" ]; then
 fi
 
 have python3 || note "python3 was not found: install it so Python code answers and new problems can be checked"
+
+# ── sandbox (Linux): it only asks for sudo when AppArmor blocks the network isolation ──
+if [ "$os" = "Linux" ] && have python3 && [ -z "${BRAINROTNT_NO_SANDBOX_SETUP:-}" ]; then
+  "$BIN_DIR/brainrotnt" setup sandbox || note "code answers will not run until the sandbox works: run brnt setup sandbox"
+fi
 
 # ── Claude Code (first install only, and only when there is a terminal to ask on) ──
 if [ -z "$update_only" ] && have claude && [ -r /dev/tty ] && ( : < /dev/tty ) 2>/dev/null; then
