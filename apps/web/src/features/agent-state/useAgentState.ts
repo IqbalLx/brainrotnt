@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { nextFinishedAt } from "../reminders/reminders";
 
 export type AgentState = "idle" | "working" | "blocked" | "done";
 
@@ -31,6 +32,8 @@ export function useAgentState() {
   // because React may batch two events into one render and hide the transition from an effect.
   // The first event is only a baseline, so loading the page mid-run does not count.
   const [runStarts, setRunStarts] = useState(0);
+  // When the agent last finished a run (left Working or Blocked for Idle or Done), for the reminder.
+  const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -59,11 +62,13 @@ export function useAgentState() {
       }
       if (lastStatus.current !== next.status) setSince(next.at);
       if ((lastStatus.current === "idle" || lastStatus.current === "done") && next.status === "working") setRunStarts((n) => n + 1);
+      const previous = lastStatus.current;
+      setFinishedAt((current) => nextFinishedAt(previous, next.status, next.at, current));
       lastStatus.current = next.status;
       setEvent(next);
     });
     return () => source.close();
   }, []);
 
-  return { event, status: event?.status ?? "idle", since, runStarts, connected };
+  return { event, status: event?.status ?? "idle", since, finishedAt, runStarts, connected };
 }

@@ -86,7 +86,7 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 
 ## Sessions and scoring
 
-A session is a fixed set of questions (default 5) chosen when it starts: problems you have never seen come first, then the ones seen longest ago. A correct answer earns 1 point, minus 0.25 for each hint opened; a wrong or skipped one earns nothing. Points and accuracy are out of the questions you answered or skipped, so a skip counts as a miss, while questions never reached before the session ended are not counted at all (answering 2 and skipping 2 of 5 is out of 4). A session ends when every question is resolved (`completed`), when you end it (`ended_early`), or when a new one starts while it is open (`abandoned`).
+A session is a fixed set of questions (default 5) chosen when it starts: problems you have never seen come first, then the ones seen longest ago. A correct answer earns 1 point, minus 0.25 for each hint opened; a wrong or skipped one earns nothing. Points and accuracy are out of the questions you answered or skipped, so a skip counts as a miss, while questions never reached before the session ended are not counted at all (answering 2 and skipping 2 of 5 is out of 4). A session ends when every question is resolved (`completed`), when you end it (`ended_early`), or when you start a new one by hand while it is open (`abandoned`). A session the agent starts never replaces one in progress: when a new run begins while a session is open (in this tab or another), the open session simply carries on.
 
 ## API
 
@@ -95,7 +95,7 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `GET /api/health` | liveness check |
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}`, where `answer` is a number, a string, an option index, or `{language, code}`; replies `{attemptId, correct, expected, detail}` |
-| `POST /api/sessions` | start a session: `{subjects, minDifficulty, maxDifficulty, size, startedBy}`; picks `size` problems (never-seen first, then least recently seen) and abandons any open session; `404` when none match |
+| `POST /api/sessions` | start a session: `{subjects, minDifficulty, maxDifficulty, size, startedBy}`; picks `size` problems (never-seen first, then least recently seen); `201` with the new session. `startedBy: "manual"` abandons any open session, while `startedBy: "agent"` keeps it and returns it with `200`; `404` when none match |
 | `GET /api/coverage` | counts per subject, topic and difficulty, for the problem bank page |
 | `GET /api/flagged` | flagged problems and review notes, without answer keys |
 | `GET /api/sessions?limit=20` | ended sessions, newest first, for the review page |
@@ -213,7 +213,7 @@ When the agent starts a new run (Idle or Done to Working), a session starts by i
 Two reminders pin a banner to the top of the window:
 
 - **Your agent needs you** when it is Blocked: "I'll check the agent" dismisses it until the agent is blocked again.
-- **Your agent is done** when it reaches Done while a session is open: "End session & see score" ends it early and shows the score screen.
+- **Your agent is done** when it finishes a run (Working to Done, or Working to Idle, which is how Luvus often reports a finished turn) while a session is open: "End session & see score" ends it early and shows the score screen. It stays up when Luvus later moves Done to Idle, until you act on it, snooze it, or the agent starts working again.
 
 Both can be snoozed for 30 seconds, 1, 2 or 5 minutes, and come back when the snooze runs out. Nothing pauses: you can keep answering while a reminder is up. When the last question is resolved, the score screen lists every question with its credit and offers to start another session.
 

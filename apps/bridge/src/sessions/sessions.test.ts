@@ -103,6 +103,36 @@ describe("starting a session", () => {
     expect(old).toMatchObject({ endReason: "abandoned", score: 0 });
     expect((await json(await app.request("/current"))).id).toBe(second.id);
   });
+
+  test("an agent run keeps the open session instead of abandoning it", async () => {
+    await insertProblem({ subject: "math" });
+    await insertProblem({ subject: "math" });
+    const first = await started({ startedBy: "manual" });
+    await answer(first.id, 0, 0);
+
+    for (let run = 0; run < 2; run++) {
+      const res = await start({ startedBy: "agent" });
+      expect(res.status).toBe(200);
+      const body = await json(res);
+      expect(body.id).toBe(first.id);
+      expect(body.position).toBe(1);
+    }
+    const [row] = await db.select().from(sessions).where(eq(sessions.id, first.id));
+    expect(row.endedAt).toBeNull();
+    expect(await db.select().from(sessions)).toHaveLength(1);
+  });
+
+  test("an agent run starts a session when none is open", async () => {
+    await insertProblem({ subject: "math" });
+    const ended = await started();
+    await app.request(`/${ended.id}/end`, { method: "POST" });
+
+    const res = await start({ startedBy: "agent" });
+    expect(res.status).toBe(201);
+    const body = await json(res);
+    expect(body.id).not.toBe(ended.id);
+    expect(body.startedBy).toBe("agent");
+  });
 });
 
 async function resetSessions() {
