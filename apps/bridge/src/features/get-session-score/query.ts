@@ -12,6 +12,10 @@ export interface SessionScore {
   maxScore: number;
   answered: number;
   correct: number;
+  subjects: string[];
+  /** Time spent on answered questions, in seconds. */
+  secondsSpent: number;
+  hintsUsed: number;
   items: {
     position: number;
     problemId: string;
@@ -25,6 +29,10 @@ export interface SessionScore {
     /** Unlocked for answered and skipped questions; a question left unanswered keeps it locked. */
     explanation: string | null;
     hasExplanation: boolean;
+    type: string;
+    secondsSpent: number | null;
+    /** What the person submitted, for their own review. */
+    answerGiven: unknown;
   }[];
 }
 
@@ -41,6 +49,9 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
       statement: problems.statement,
       explanation: problems.explanation,
       correct: attempts.correct,
+      type: problems.type,
+      secondsSpent: attempts.secondsSpent,
+      answerGiven: attempts.answerGiven,
     })
     .from(sessionItems)
     .innerJoin(problems, eq(problems.id, sessionItems.problemId))
@@ -60,6 +71,9 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
     hintsUsed: row.hintsRevealed,
     explanation: row.outcome === null ? null : row.explanation,
     hasExplanation: row.explanation !== null,
+    type: row.type,
+    secondsSpent: row.secondsSpent,
+    answerGiven: row.answerGiven,
   }));
   return {
     id: session.id,
@@ -70,6 +84,9 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
     maxScore: items.length,
     answered: items.filter((item) => item.outcome === "answered").length,
     correct: items.filter((item) => item.correct === true).length,
+    subjects: [...new Set(items.map((item) => item.subject))],
+    secondsSpent: Math.round(items.reduce((sum, item) => sum + (item.secondsSpent ?? 0), 0) * 10) / 10,
+    hintsUsed: items.reduce((sum, item) => sum + item.hintsUsed, 0),
     items,
   };
 }
