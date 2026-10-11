@@ -20,7 +20,7 @@ interface BottomSheetProps {
   children: ReactNode;
 }
 
-const SNAP_LABEL: Record<Snap, string> = { 0.25: "25%", 0.5: "50%", 0.75: "75%", 1: "Full" };
+const SNAP_LABEL: Record<Snap, string> = { 0.5: "50%", 0.75: "75%", 1: "Full" };
 const percent = (snap: number) => Math.round(snap * 100);
 
 interface Drag {
@@ -31,7 +31,7 @@ interface Drag {
 }
 
 /**
- * A non-modal sheet anchored to the bottom of the screen. It rests at 25, 50, 75 or 100% of the viewport
+ * A non-modal sheet anchored to the bottom of the screen. It rests at 50, 75 or 100% of the viewport
  * height: drag the header (a flick moves one step, dragging it nearly shut closes it), press the snap
  * buttons, or focus the handle and use the arrow keys. The page underneath stays usable, and gets bottom
  * padding while the sheet is open so nothing is stranded behind it. Closing only hides it, so whatever is

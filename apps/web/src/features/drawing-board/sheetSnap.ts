@@ -1,5 +1,6 @@
-// Heights the drawing sheet rests at, as fractions of the viewport.
-export const SNAPS = [0.25, 0.5, 0.75, 1] as const;
+// Heights the drawing sheet rests at, as fractions of the viewport. A quarter of the screen was
+// too small to draw in, so the sheet starts at half.
+export const SNAPS = [0.5, 0.75, 1] as const;
 export type Snap = (typeof SNAPS)[number];
 
 export const DEFAULT_SNAP: Snap = 0.5;
@@ -8,8 +9,8 @@ export const DEFAULT_SNAP: Snap = 0.5;
 // in the flick's direction, even if the sheet has not been dragged past the halfway point between snaps.
 // A quick 60 px flick measured in Chromium was about 1.1, so the bar sits well below that.
 const FLICK = 0.6;
-// Dragged this far below the smallest snap, the sheet closes instead of resting.
-const CLOSE_BELOW = 0.12;
+// Dragged below this, halfway down from the smallest snap, the sheet closes instead of resting.
+const CLOSE_BELOW = SNAPS[0] / 2;
 
 /**
  * Where the sheet settles when a drag ends: `fraction` is its height then, `velocity` how fast it

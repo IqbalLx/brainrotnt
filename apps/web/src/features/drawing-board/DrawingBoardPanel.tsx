@@ -59,7 +59,7 @@ export function DrawingBoardPanel({ statement, calculator, onDraw }: DrawingBoar
     <section aria-label="Drawing board" className="flex items-center justify-between gap-3 rounded-lg bg-surface-sunken p-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-heading-sm">Drawing board</span>
-        <span className="text-body-sm text-ink-muted">Opens from the bottom; drag it to 25, 50, 75% or full screen.</span>
+        <span className="text-body-sm text-ink-muted">Opens from the bottom; drag it to 50, 75% or full screen.</span>
       </div>
       <Button
         variant="outline"
