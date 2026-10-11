@@ -62,7 +62,8 @@ export async function start(options: StartOptions, { paths, version, webAssets, 
   const uhpClient = createUhpClient({ mockWhenUnset: false, defaultSocketPath: luvusSocket() });
   await uhpClient.start();
 
-  const addresses = options.network ? lanAddresses() : [];
+  // --host adds names lanAddresses() leaves out on purpose, such as a Tailscale address; they follow the LAN ones, so the QR code stays the Wi-Fi link.
+  const addresses = options.network ? [...new Set([...lanAddresses(), ...options.hosts])] : [];
   const key = randomBytes(18).toString("base64url");
   const access = options.network ? networkAccess({ key, hosts: addresses, allowRemoteCode: options.allowRemoteCode }) : localOnly;
   const app = createApp({ uhpClient, sandbox, version, access, webAssets });

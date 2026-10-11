@@ -9,7 +9,7 @@ const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
 export interface NetworkAccess {
   /** Required from every device other than this computer; part of the printed network link. */
   key: string;
-  /** Host names the app may be reached by: the machine's LAN addresses. */
+  /** Host names the app may be reached by: the machine's LAN addresses and any given with --host. */
   hosts: string[];
   /** Let other devices submit code answers, which run on this machine. Off by default. */
   allowRemoteCode: boolean;

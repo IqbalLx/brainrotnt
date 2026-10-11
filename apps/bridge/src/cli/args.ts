@@ -1,7 +1,7 @@
 export const DEFAULT_PORT = 8787;
 
 export type Command =
-  | { name: "start"; port: number | null; network: boolean; open: boolean; allowRemoteCode: boolean }
+  | { name: "start"; port: number | null; network: boolean; open: boolean; allowRemoteCode: boolean; hosts: string[] }
   | { name: "doctor" }
   | { name: "setup-claude" }
   | { name: "setup-sandbox"; check: boolean }
@@ -26,6 +26,8 @@ Options for starting:
   -p, --port <n>           use exactly this port (default: 8787, or the next free one)
   -n, --network            also serve on your local network, with an access key and a QR code
       --allow-remote-code  in network mode, let other devices run code answers on this machine
+      --host <name>        in network mode, also answer to this address or name, e.g. a Tailscale IP or
+                           MagicDNS name (repeatable; LAN addresses are found by themselves)
   -o, --open               open the browser right away
   -h, --help               show this help
 
@@ -59,7 +61,7 @@ export function parseArgs(argv: string[]): Command {
       return { name: "help" };
   }
 
-  const start: Extract<Command, { name: "start" }> = { name: "start", port: null, network: false, open: false, allowRemoteCode: false };
+  const start: Extract<Command, { name: "start" }> = { name: "start", port: null, network: false, open: false, allowRemoteCode: false, hosts: [] };
   const args = first === "start" ? rest : argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -67,7 +69,12 @@ export function parseArgs(argv: string[]): Command {
     else if (arg === "-n" || arg === "--network") start.network = true;
     else if (arg === "-o" || arg === "--open") start.open = true;
     else if (arg === "--allow-remote-code") start.allowRemoteCode = true;
-    else if (arg === "-p" || arg === "--port" || arg.startsWith("--port=")) {
+    else if (arg === "--host" || arg.startsWith("--host=")) {
+      const value = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : args[++i];
+      const host = hostName(value);
+      if (!host) return { name: "error", message: `invalid host: ${value ?? "(missing)"} (a name or IP address, without a scheme or port)` };
+      if (!start.hosts.includes(host)) start.hosts.push(host);
+    } else if (arg === "-p" || arg === "--port" || arg.startsWith("--port=")) {
       const value = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : args[++i];
       const port = Number(value);
       if (!Number.isInteger(port) || port < 1 || port > 65535) return { name: "error", message: `invalid port: ${value ?? "(missing)"}` };
@@ -75,7 +82,23 @@ export function parseArgs(argv: string[]): Command {
     } else return unexpected(arg);
   }
   if (start.allowRemoteCode && !start.network) return { name: "error", message: "--allow-remote-code only applies with --network" };
+  if (start.hosts.length && !start.network) return { name: "error", message: "--host only applies with --network" };
   return start;
+}
+
+/**
+ * A host name as the access check sees it (URL.hostname: lowercase, IPv6 in brackets), or null when the
+ * value is not a bare host: no scheme, port, path or credentials.
+ */
+function hostName(value: string | undefined): string | null {
+  if (!value || /[/@?#\s]/.test(value)) return null;
+  const literal = value.includes(":") && !value.startsWith("[") ? `[${value}]` : value;
+  try {
+    const url = new URL(`http://${literal}/`);
+    return url.port === "" && url.hostname ? url.hostname : null;
+  } catch {
+    return null;
+  }
 }
 
 const unexpected = (arg: string): Command => ({ name: "error", message: `unknown argument: ${arg} (see brnt --help)` });
