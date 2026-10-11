@@ -17,6 +17,8 @@ export interface SandboxOptions {
   /** Address-space limit (`ulimit -v`). 0 turns it off. */
   memoryMb?: number;
   maxOutputBytes?: number;
+  /** CPU-time backstop (`ulimit -t`). Defaults to a second past the wall-clock limit. */
+  cpuSeconds?: number;
 }
 
 export type Language = "python" | "javascript";
@@ -68,8 +70,9 @@ export function resetSandboxProbe(): void {
   probe = null;
 }
 
-function limitsScript(memoryMb: number, timeoutMs: number): string {
-  const cpuSeconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+// The wall-clock timer decides timeouts. The CPU limit is only a backstop if this process stalls, so it
+// sits a second past the timer: equal limits race, and a kill by the kernel used to read as a crash.
+function limitsScript(memoryMb: number, cpuSeconds: number): string {
   // Each limit is best effort: `ulimit -v` is not supported everywhere (macOS), so a failure is not fatal.
   return [
     `ulimit -t ${cpuSeconds} 2>/dev/null`,
@@ -102,6 +105,7 @@ export function runPython(code: string, options: SandboxOptions = {}): Promise<S
 export async function runProgram(program: Program, options: SandboxOptions = {}): Promise<SandboxResult> {
   const javascript = program.language === "javascript";
   const { timeoutMs, memoryMb, maxOutputBytes } = { ...DEFAULTS, ...options };
+  const cpuSeconds = options.cpuSeconds ?? Math.ceil(timeoutMs / 1000) + 1;
   const started = performance.now();
   const elapsed = () => Math.round(performance.now() - started);
   const fail = (reason: SandboxFailure, message: string, stderr = ""): SandboxResult => ({
@@ -127,7 +131,7 @@ export async function runProgram(program: Program, options: SandboxOptions = {})
   const dir = await mkdtemp(join(tmpdir(), "brainrotnt-sandbox-"));
   try {
     for (const [name, content] of Object.entries(program.files)) await writeFile(join(dir, name), content, "utf8");
-    const script = `${limitsScript(memoryMb, timeoutMs)}; exec "$0" ${flags}`;
+    const script = `${limitsScript(memoryMb, cpuSeconds)}; exec "$0" ${flags}`;
     const command = ["sh", "-c", script, interpreter, program.main];
     if (mode === "strict") command.unshift(unshareBin(), "-rn", "--");
 
@@ -165,7 +169,10 @@ export async function runProgram(program: Program, options: SandboxOptions = {})
     ]);
     clearTimeout(timer);
 
-    if (timedOut) return fail("timeout", `Timed out after ${timeoutMs} ms`, stderr);
+    // The CPU backstop ends the process with SIGXCPU or, when it is also the hard limit, SIGKILL. Neither
+    // is a crash in the code: the only other SIGKILLs come from this runner, flagged above.
+    const cpuKilled = !overflowed && (proc.signalCode === "SIGXCPU" || proc.signalCode === "SIGKILL");
+    if (timedOut || cpuKilled) return fail("timeout", `Timed out after ${timeoutMs} ms`, stderr);
     if (overflowed) return fail("output_too_large", `Output exceeded ${maxOutputBytes} bytes`, stderr);
     if (exitCode !== 0) return fail("nonzero_exit", `Exited with code ${exitCode}`, stderr);
     return { ok: true, stdout, durationMs: elapsed() };
