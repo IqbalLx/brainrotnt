@@ -29,6 +29,13 @@
       "when": 1791685748808,
       "tag": "0003_explanations",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791686023757,
+      "tag": "0004_trivia",
+      "breakpoints": true
     }
   ]
 }

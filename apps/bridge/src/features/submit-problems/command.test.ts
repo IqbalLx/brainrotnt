@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
 import { listFlagged } from "../list-flagged/query";
-import { codeSpec, mcqSpec, numericSpec, resetDb, symbolicSpec } from "../../test-support";
+import { codeSpec, mcqSpec, numericSpec, resetDb, symbolicSpec, triviaSpec } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitProblems } from "./command";
 
@@ -307,5 +307,65 @@ describe("explanations", () => {
 
   test("code explanations need no Answer line", async () => {
     expect((await submitProblems([codeSpec({ explanation: "Filter the even numbers, then sum them." })])).inserted).toBe(1);
+  });
+});
+
+describe("trivia", () => {
+  const rows = () => db.select().from(problems);
+
+  test("two sources on different sites make it verified, and the sources are stored", async () => {
+    const result = await submitProblems([triviaSpec()]);
+    expect(result.results[0]).toMatchObject({ status: "inserted" });
+    expect(result.results[0]).not.toHaveProperty("verification");
+    const [row] = await rows();
+    expect(row).toMatchObject({ subject: "trivia", type: "numeric", verificationStatus: "verified", tools: { calculator: "none", draw: false } });
+    expect(row.sources).toHaveLength(2);
+    expect(row.answer).toEqual({ value: 1989, tolerance: 0 });
+  });
+
+  test("one source, or two pages of one site, is stored as unverified", async () => {
+    const one = await submitProblems([triviaSpec({ sources: [{ url: "https://a.example.org/x", quote: "It happened in 1989 here." }] })]);
+    expect(one.results[0]).toMatchObject({ status: "inserted", verification: "unverified" });
+    const sameSite = await submitProblems([
+      triviaSpec({
+        sources: [
+          { url: "https://a.example.org/x", quote: "It happened in 1989 here." },
+          { url: "https://www.a.example.org/y", quote: "The year was 1989, it says." },
+        ],
+      }),
+    ]);
+    expect(sameSite.results[0]).toMatchObject({ verification: "unverified" });
+    expect((await rows()).map((r) => r.verificationStatus)).toEqual(["unverified", "unverified"]);
+  });
+
+  test("a year is exact by default", async () => {
+    await submitProblems([triviaSpec()]);
+    const [row] = await rows();
+    expect((row.answer as { tolerance: number }).tolerance).toBe(0);
+  });
+
+  test("facts that change over time are rejected unless a year is pinned", async () => {
+    const current = await submitProblems([triviaSpec({ statement: "Who is the current secretary-general of the organisation?", type: "mcq", answer: { options: ["A", "B"], correct: 0 } })]);
+    expect((current.results[0] as any).errors[0]).toContain('"current"');
+    const pinned = await submitProblems([triviaSpec({ statement: "Who was the reigning champion as of 2020 in the test event?", type: "mcq", answer: { options: ["Ann", "Bob"], correct: 0 } })]);
+    expect(pinned.inserted).toBe(1);
+  });
+
+  test("trivia has no calculator, no drawing board and no reference code, and needs sources", async () => {
+    expect((await submitProblems([triviaSpec({ tools: { calculator: "basic", draw: false } })])).inserted).toBe(0);
+    expect((await submitProblems([triviaSpec({ tools: { calculator: "none", draw: true } })])).inserted).toBe(0);
+    expect((await submitProblems([triviaSpec({ sources: [] })])).inserted).toBe(0);
+    expect((await submitProblems([triviaSpec({ sources: [{ url: "ftp://x.example.org/a", quote: "A quote of some length." }] })])).inserted).toBe(0);
+    expect((await submitProblems([triviaSpec({ type: "symbolic", answer: { expression: "x", variables: ["x"] } })])).inserted).toBe(0);
+  });
+
+  test("STEM subjects cannot be used without a reference, and trivia hints and explanations are checked", async () => {
+    expect((await submitProblems([triviaSpec({ subject: "math" })])).inserted).toBe(0);
+    const leak = await submitProblems([triviaSpec({ hints: ["Late 1980s, in Europe.", "It is 1989."] })]);
+    expect((leak.results[0] as any).errors[0]).toContain("hints.1: contains the answer (1989)");
+    const wrong = await submitProblems([triviaSpec({ explanation: "Context.\n\nAnswer: 1990" })]);
+    expect((wrong.results[0] as any).errors[0]).toContain("does not match the key");
+    const good = await submitProblems([triviaSpec({ hints: ["Late 1980s, in Europe."], explanation: "Context.\n\nAnswer: 1989" })]);
+    expect(good.inserted).toBe(1);
   });
 });

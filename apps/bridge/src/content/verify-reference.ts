@@ -3,11 +3,12 @@ import { z } from "zod";
 import { runPython, type SandboxResult } from "../infra/sandbox-runner";
 import type { CodeSpec, ProblemSpec } from "./problem-spec";
 import { explanationIssues } from "./explanation";
+import { triviaStatus } from "./trivia";
 import { hintLeaks, hintReviewNotes, keyedProblem } from "./hints";
 import { describeTestFailure, runTests, type TestReport } from "./run-tests";
 
 /** `notes` are reasons for a person to review an accepted problem; they do not block it. */
-export type VerifyResult = { ok: true; notes: string[] } | { ok: false; error: string };
+export type VerifyResult = { ok: true; notes: string[]; status?: "verified" | "unverified" } | { ok: false; error: string };
 
 function describeFailure(run: Extract<SandboxResult, { ok: false }>): string {
   switch (run.reason) {
@@ -43,10 +44,12 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
     ...(spec.explanation ? explanationIssues(keyed, spec.explanation) : []),
   ];
   if (issues.length > 0) return { ok: false, error: issues.join("; ") };
-  return { ok: true, notes: spec.hints ? hintReviewNotes(keyed, spec.hints) : [] };
+  return { ok: true, notes: spec.hints ? hintReviewNotes(keyed, spec.hints) : [], ...(key.status ? { status: key.status } : {}) };
 }
 
 async function verifyKey(spec: ProblemSpec): Promise<VerifyResult> {
+  // Code cannot check trivia: the sources decide whether it counts as verified.
+  if (spec.subject === "trivia") return { ok: true, notes: [], status: triviaStatus(spec.sources) };
   if (spec.type === "code") return verifyCode(spec);
   const run = await runPython(spec.reference.code);
   if (!run.ok) return { ok: false, error: describeFailure(run) };

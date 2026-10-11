@@ -127,3 +127,20 @@ export function codeSpec(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+// A placeholder fact for tests only; the sources are illustrative, not citations.
+export function triviaSpec(overrides: Record<string, unknown> = {}) {
+  return {
+    subject: "trivia",
+    topic: "history",
+    difficulty: 1,
+    type: "numeric",
+    statement: `In which year did the event in test case ${unique()} happen?`,
+    answer: { value: 1989 },
+    sources: [
+      { url: "https://archive.example.org/event", quote: "The event happened in 1989, as recorded here." },
+      { url: "https://www.encyclopedia.example.com/event", quote: "In 1989 the event took place." },
+    ],
+    ...overrides,
+  };
+}

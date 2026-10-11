@@ -268,3 +268,20 @@ describe("explanations", () => {
     expect(score.items[0].explanation).toContain("Answer: 42");
   });
 });
+
+describe("trivia in sessions", () => {
+  test("unverified trivia is served with a badge; unverified STEM is not served", async () => {
+    await insertProblem({ subject: "trivia", verificationStatus: "unverified" });
+    await insertProblem({ subject: "math", verificationStatus: "unverified" });
+    const view = await started({ subjects: ["trivia", "math"], size: 5 });
+    expect(view.size).toBe(1);
+    expect(view.current).toMatchObject({ subject: "trivia", unverified: true });
+  });
+
+  test("a trivia-only session is possible", async () => {
+    await insertProblem({ subject: "trivia" });
+    await insertProblem({ subject: "math" });
+    const view = await started({ subjects: ["trivia"] });
+    expect(view).toMatchObject({ size: 1, subjects: ["trivia"], current: { subject: "trivia", unverified: false } });
+  });
+});

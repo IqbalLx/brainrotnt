@@ -1,4 +1,4 @@
-import { and, between, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, between, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import { attempts, problems, sessionItems, sessions } from "../../db/schema";
 import { finish, findSession, type SessionRow } from "../../sessions/session";
@@ -18,7 +18,8 @@ async function pickProblems(body: StartSessionBody): Promise<string[]> {
     .where(
       and(
         inArray(problems.subject, body.subjects),
-        eq(problems.verificationStatus, "verified"),
+        // Trivia with a single source is still served, with an Unverified badge.
+        or(eq(problems.verificationStatus, "verified"), and(eq(problems.subject, "trivia"), eq(problems.verificationStatus, "unverified"))),
         between(problems.difficulty, body.minDifficulty, body.maxDifficulty),
       ),
     )
