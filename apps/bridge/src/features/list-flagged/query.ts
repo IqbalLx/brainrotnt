@@ -36,6 +36,7 @@ export async function listFlagged() {
     tools: p.tools,
     answer: p.answer,
     hints: p.hints,
+    explanation: p.explanation,
     inRotation: p.verificationStatus === "verified",
     flags: open.filter((f) => f.problemId === p.id).map((f) => ({ id: f.id, reason: f.reason, createdAt: f.createdAt.toISOString() })),
   }));

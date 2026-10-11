@@ -44,7 +44,7 @@ const FENCE = /```[a-zA-Z]*\n([\s\S]*?)```/g;
 export type KeyedProblem =
   | { type: "numeric"; answer: { value: number; tolerance: number } }
   | { type: "mcq"; answer: { options: string[]; correct: number } }
-  | { type: "symbolic"; answer: { expression: string } }
+  | { type: "symbolic"; answer: { expression: string; variables?: string[] } }
   | { type: "code"; answer: Pick<CodeAnswer, "entry" | "tests">; references: Partial<Record<Language, string>> };
 
 // Rejects any hint that gives the answer away. For code, a hint whose code passes every test is a solution.

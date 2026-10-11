@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { codeAnswer, codeTest, mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
 import { ENTRY_PATTERN } from "../infra/code-runner";
+import { explanationSpec } from "./explanation";
 import { hintsSpec } from "./hints";
 
 const common = {
@@ -24,6 +25,7 @@ const common = {
     .default({}),
   source: z.string().trim().max(200).optional().describe("A pointer to where the syllabus topic comes from, such as a chapter. Never copied text."),
   hints: hintsSpec,
+  explanation: explanationSpec,
 };
 
 const base = { ...common, subject: z.enum(["math", "stats", "physics"]).describe("The subject. Programming problems use type code instead.") };
@@ -147,7 +149,7 @@ const template = z.object({
     .trim()
     .min(10)
     .max(2000)
-    .describe("Plain text with {name} placeholders, one per generated parameter, e.g. 'A ball is launched at {v} m/s...'. Top-level hints may use the same placeholders."),
+    .describe("Plain text with {name} placeholders, one per generated parameter, e.g. 'A ball is launched at {v} m/s...'. Top-level hints and the explanation may use the same placeholders, and the explanation may also use {answer} for each variant's answer (the number, or the correct option's text)."),
   generator: z
     .string()
     .min(1)

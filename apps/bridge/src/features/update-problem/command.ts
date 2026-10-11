@@ -51,6 +51,7 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
         tools: spec.tools,
         answer: storedAnswer(spec),
         hints: spec.hints ?? null,
+        explanation: spec.explanation ?? null,
         verificationStatus: "verified",
         source: spec.source ?? existing.source,
         statementHash: hash,
