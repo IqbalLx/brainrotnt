@@ -9,6 +9,7 @@ import { CodeAnswer } from "../code-editor/CodeAnswer";
 import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
 import { AnswerInput } from "./AnswerInput";
+import { Hints } from "./Hints";
 import type { AttemptResult, Phase, Problem } from "./types";
 
 const CalculatorPanel = lazy(() => import("../calculator/CalculatorPanel"));
@@ -26,6 +27,10 @@ interface ProblemCardProps {
   onSkip: () => void;
   /** What moving on is called after a result, e.g. "Next question" or "See your score". */
   nextLabel: string;
+  hints: string[];
+  hintCount: number;
+  openingHint: boolean;
+  onOpenHint: () => void;
 }
 
 export function ProblemCard(props: ProblemCardProps) {
@@ -57,6 +62,10 @@ function ActiveProblem({
   onNext,
   onSkip,
   nextLabel,
+  hints,
+  hintCount,
+  openingHint,
+  onOpenHint,
 }: ProblemCardProps) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
@@ -101,6 +110,8 @@ function ActiveProblem({
         </div>
 
         <p className="text-body text-ink">{problem.statement}</p>
+
+        <Hints hints={hints} hintCount={hintCount} canOpen={!locked} opening={openingHint} onOpen={onOpenHint} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {codeView ? (

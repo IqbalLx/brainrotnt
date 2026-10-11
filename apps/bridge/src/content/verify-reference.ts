@@ -2,9 +2,11 @@ import { checkEquivalent, verifyKeyAgainstPoints } from "@brainrotnt/math-engine
 import { z } from "zod";
 import { runPython, type SandboxResult } from "../infra/sandbox-runner";
 import type { CodeSpec, ProblemSpec } from "./problem-spec";
+import { hintLeaks, hintReviewNotes, keyedProblem } from "./hints";
 import { describeTestFailure, runTests, type TestReport } from "./run-tests";
 
-export type VerifyResult = { ok: true } | { ok: false; error: string };
+/** `notes` are reasons for a person to review an accepted problem; they do not block it. */
+export type VerifyResult = { ok: true; notes: string[] } | { ok: false; error: string };
 
 function describeFailure(run: Extract<SandboxResult, { ok: false }>): string {
   switch (run.reason) {
@@ -32,6 +34,15 @@ function lastLine(output: string): string {
 const EPSILON = 1e-9;
 
 export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> {
+  const key = await verifyKey(spec);
+  if (!key.ok || !spec.hints) return key;
+  const keyed = keyedProblem(spec);
+  const leaks = await hintLeaks(keyed, spec.hints);
+  if (leaks.length > 0) return { ok: false, error: leaks.join("; ") };
+  return { ok: true, notes: hintReviewNotes(keyed, spec.hints) };
+}
+
+async function verifyKey(spec: ProblemSpec): Promise<VerifyResult> {
   if (spec.type === "code") return verifyCode(spec);
   const run = await runPython(spec.reference.code);
   if (!run.ok) return { ok: false, error: describeFailure(run) };
@@ -49,7 +60,7 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
     if (computed !== spec.answer.correct) {
       return { ok: false, error: `reference solution picked option ${JSON.stringify(computed)} but the stated key is ${spec.answer.correct}` };
     }
-    return { ok: true };
+    return { ok: true, notes: [] };
   }
 
   if (typeof computed !== "number" || !Number.isFinite(computed)) {
@@ -60,7 +71,7 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
   if (Math.abs(computed - value) > allowed) {
     return { ok: false, error: `reference solution computed ${computed} but the stated key is ${value} (tolerance ${tolerance})` };
   }
-  return { ok: true };
+  return { ok: true, notes: [] };
 }
 
 const languageNames = ["python", "javascript"] as const;
@@ -97,7 +108,7 @@ async function verifyCode(spec: CodeSpec): Promise<VerifyResult> {
       return { ok: false, error: `${language} starter code already passes every test; it must leave the problem unsolved` };
     }
   }
-  return { ok: true };
+  return { ok: true, notes: [] };
 }
 
 const referencePoints = z.object({
@@ -124,7 +135,7 @@ function verifySymbolic(answer: Extract<ProblemSpec, { type: "symbolic" }>["answ
   if (!key.ok) return { ok: false, error: key.error };
 
   const verdict = verifyKeyAgainstPoints(answer.expression, answer.variables, parsed.data.points);
-  return verdict.ok ? { ok: true } : { ok: false, error: `reference solution disagrees with the key: ${verdict.error}` };
+  return verdict.ok ? { ok: true, notes: [] } : { ok: false, error: `reference solution disagrees with the key: ${verdict.error}` };
 }
 
 // Verifies several problems with a few sandboxes running at once.

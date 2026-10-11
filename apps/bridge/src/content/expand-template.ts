@@ -2,6 +2,7 @@ import { z } from "zod";
 import { mcqAnswer } from "../db/answer";
 import { runPython } from "../infra/sandbox-runner";
 import { statementHash } from "./hash";
+import { hintLeaks } from "./hints";
 import type { TemplateSpec } from "./problem-spec";
 
 export const CHECK_SEEDS = 50;
@@ -11,6 +12,7 @@ export interface Variant {
   statement: string;
   hash: string;
   answer: { value: number; tolerance: number; unit?: string } | { options: string[]; correct: number };
+  hints?: string[];
 }
 
 export type ExpandResult = { ok: true; variants: Variant[] } | { ok: false; errors: string[] };
@@ -114,7 +116,16 @@ export async function expandTemplate(spec: TemplateSpec): Promise<ExpandResult> 
       }
       answer = parsed.data;
     }
-    candidates.push({ seed: row.seed, statement, hash: statementHash(statement, spec.topic), answer });
+    let hints: string[] | undefined;
+    if (spec.hints) {
+      const filled = spec.hints.map((hint) => fill(hint, shape.data.params));
+      if (filled.some((hint) => hint === null)) {
+        problems.push(`${where}: a hint uses a {placeholder} that params does not have`);
+        continue;
+      }
+      hints = filled as string[];
+    }
+    candidates.push({ seed: row.seed, statement, hash: statementHash(statement, spec.topic), answer, ...(hints ? { hints } : {}) });
   }
 
   // Every seed must work: a generator that fails on some seeds would fail on some variants later.
@@ -129,5 +140,14 @@ export async function expandTemplate(spec: TemplateSpec): Promise<ExpandResult> 
   if (distinct.length < spec.template.variants) {
     return { ok: false, errors: [`generator produced only ${distinct.length} distinct statements over ${CHECK_SEEDS} seeds but ${spec.template.variants} variants were requested`] };
   }
-  return { ok: true, variants: distinct.slice(0, spec.template.variants) };
+  const variants = distinct.slice(0, spec.template.variants);
+
+  // Hints are checked against each variant's own answer, since the numbers change from one to the next.
+  for (const variant of variants) {
+    if (!variant.hints) continue;
+    const keyed = "options" in variant.answer ? { type: "mcq" as const, answer: variant.answer } : { type: "numeric" as const, answer: variant.answer };
+    const leaks = await hintLeaks(keyed, variant.hints);
+    if (leaks.length > 0) return { ok: false, errors: leaks.map((leak) => `seed ${variant.seed}: ${leak}`) };
+  }
+  return { ok: true, variants };
 }

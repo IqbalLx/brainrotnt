@@ -20,7 +20,7 @@ export interface SessionView {
   endReason: "completed" | "ended_early" | "abandoned" | null;
   position: number | null;
   items: SessionItem[];
-  current: (Problem & { hintsRevealed: number }) | null;
+  current: (Problem & { hintsRevealed: number; hintCount: number; hints: string[] }) | null;
 }
 
 export interface SessionScore {
@@ -204,6 +204,24 @@ export function useSession(agentState: AgentState) {
     }
   }, [view, showQuestion]);
 
+  const [revealing, setRevealing] = useState(false);
+  const revealHint = useCallback(async () => {
+    if (!view?.current || view.position === null || revealing) return;
+    setRevealing(true);
+    try {
+      const res = await post(`/api/sessions/${view.id}/hints`, { position: view.position });
+      if (!res.ok) throw new Error(`bridge returned ${res.status}`);
+      const body = (await res.json()) as { hints: string[]; hintsRevealed: number };
+      setView((current) =>
+        current?.current ? { ...current, current: { ...current.current, hints: body.hints, hintsRevealed: body.hintsRevealed } } : current,
+      );
+    } catch {
+      setMessage("Could not open the hint.");
+    } finally {
+      setRevealing(false);
+    }
+  }, [view, revealing]);
+
   const flag = useCallback(async () => {
     const problem = view?.current;
     if (!problem || flagged) return;
@@ -220,5 +238,5 @@ export function useSession(agentState: AgentState) {
   // until "Next", so a Done reminder can still offer to end it.
   const open = view !== null && view.endedAt === null && !(phase === "result" && pending.current?.endedAt);
 
-  return { view, phase, result, message, flagged, score, open, start, submit, next, skip, end, flag };
+  return { view, phase, result, message, flagged, score, open, revealing, start, submit, next, skip, end, flag, revealHint };
 }

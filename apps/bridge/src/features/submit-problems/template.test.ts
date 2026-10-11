@@ -165,3 +165,33 @@ def generate(seed):
     expect(result).toMatchObject({ inserted: 2, rejected: 1, problemsAdded: 11 });
   });
 });
+
+describe("template hints", () => {
+  test("hints may use the placeholders and are filled per variant", async () => {
+    const result = await submitProblems([template({ hints: ["Split {b} into tens and units.", "Work out {a} × 10 first."] })]);
+    expect(result.inserted).toBe(1);
+    const rows = await db.select().from(problems);
+    for (const row of rows) {
+      expect(row.hints).toHaveLength(2);
+      expect(row.hints![0]).not.toContain("{b}");
+      expect(row.statement).toContain(row.hints![1].match(/Work out (\d+)/)![1]);
+    }
+  });
+
+  test("a hint that states a variant's answer is rejected", async () => {
+    const leaky = `
+import random
+def generate(seed):
+    rng = random.Random(seed)
+    a, b = rng.randint(11, 99), rng.randint(11, 99)
+    return {"params": {"a": a, "b": b, "p": a * b}, "answer": a * b}
+`;
+    const result = await submitProblems([template({ template: { statement: "What is {a} times {b}? Give a whole number.", generator: leaky, variants: 5 }, hints: ["It is {p}."] })]);
+    expect(errorsOf(result)).toContain("hints.0: contains the answer");
+  });
+
+  test("a hint with an unknown placeholder is rejected", async () => {
+    const result = await submitProblems([template({ hints: ["Use {c}."] })]);
+    expect(errorsOf(result)).toContain("a hint uses a {placeholder}");
+  });
+});

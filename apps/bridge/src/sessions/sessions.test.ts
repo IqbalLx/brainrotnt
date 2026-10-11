@@ -7,13 +7,14 @@ import { answerSessionQuestionRoute } from "../features/answer-session-question/
 import { endSessionRoute } from "../features/end-session/route";
 import { getCurrentSessionRoute } from "../features/get-current-session/route";
 import { getSessionScoreRoute } from "../features/get-session-score/route";
+import { revealHintRoute } from "../features/reveal-hint/route";
 import { skipSessionQuestionRoute } from "../features/skip-session-question/route";
 import { startSessionRoute } from "../features/start-session/route";
 import { insertProblem, json, postJson, resetDb } from "../test-support";
 import { creditFor } from "./session";
 
 const app = new Hono();
-for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute]) {
+for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
   app.route("/", route);
 }
 
@@ -210,5 +211,40 @@ describe("the score screen", () => {
       ["unanswered", 0, 0],
     ]);
     expect(score.items[0].statement).toContain("Test statement");
+  });
+});
+
+describe("hints", () => {
+  const withHints = () => insertProblem({ subject: "math", hints: ["Think about it.", "Set it up.", "Use the formula."] });
+  const reveal = (id: string, position: number) => app.request(`/${id}/hints`, postJson({ position }));
+
+  test("only opened hints are sent, one at a time, and the count is kept", async () => {
+    await withHints();
+    const view = await started();
+    expect(view.current).toMatchObject({ hintCount: 3, hintsRevealed: 0, hints: [] });
+
+    expect(await json(await reveal(view.id, 0))).toEqual({ hints: ["Think about it."], hintsRevealed: 1, hintCount: 3, maxCredit: 0.75 });
+    expect(await json(await reveal(view.id, 0))).toMatchObject({ hints: ["Think about it.", "Set it up."], maxCredit: 0.5 });
+    expect((await json(await app.request("/current"))).current).toMatchObject({ hintsRevealed: 2, hints: ["Think about it.", "Set it up."] });
+
+    await reveal(view.id, 0);
+    expect((await reveal(view.id, 0)).status).toBe(409);
+    expect(await json(await answer(view.id, 0, "42"))).toMatchObject({ correct: true, credit: 0.25, hintsUsed: 3 });
+  });
+
+  test("a problem without hints has none to open", async () => {
+    await insertProblem({ subject: "math" });
+    const view = await started();
+    expect(view.current).toMatchObject({ hintCount: 0, hints: [] });
+    expect((await reveal(view.id, 0)).status).toBe(409);
+  });
+
+  test("hints can only be opened on the current question of an open session", async () => {
+    await withHints();
+    await withHints();
+    const view = await started({ size: 2 });
+    expect((await reveal(view.id, 1)).status).toBe(409);
+    await app.request(`/${view.id}/end`, { method: "POST" });
+    expect((await reveal(view.id, 0)).status).toBe(409);
   });
 });
