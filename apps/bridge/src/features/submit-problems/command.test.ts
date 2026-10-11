@@ -183,8 +183,8 @@ describe("code problems", () => {
     expect(answer.tests).toHaveLength(5);
   });
 
-  test("is served with its starters and visible examples only", async () => {
-    await submitProblems([codeSpec()]);
+  test("is served with its starters and the tests its difficulty discloses only", async () => {
+    await submitProblems([codeSpec({ difficulty: 3 })]);
     const view = await served("code");
     expect(view).toMatchObject({ type: "code", code: { entry: "solve" } });
     expect(view.code.languages.map((l: any) => l.language).sort()).toEqual(["javascript", "python"]);
@@ -192,10 +192,17 @@ describe("code problems", () => {
       { args: [[1, 2, 3, 4]], expected: 6 },
       { args: [[]], expected: 0 },
     ]);
+    expect(view.code.moreTests).toBe(3);
     const text = JSON.stringify(view);
     expect(text).not.toContain("hidden");
     expect(text).not.toContain("sum(");
     expect(text).not.toContain("reduce");
+  });
+
+  test("an easy one discloses every test, a hard one a single test", async () => {
+    await submitProblems([codeSpec({ difficulty: 1 })]);
+    expect((await served("code")).code).toMatchObject({ moreTests: 0 });
+    expect((await served("code")).code.examples).toHaveLength(5);
   });
 
   test("a reference that fails a test is rejected and names the call", async () => {

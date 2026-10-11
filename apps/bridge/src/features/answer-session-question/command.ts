@@ -18,8 +18,8 @@ export async function answerQuestion(sessionId: string, body: AnswerBody): Promi
   if (!item) return { status: "ended" };
   if (item.position !== body.position) return { status: "wrong_position" };
 
-  const [problem] = await db.select({ type: problems.type, answer: problems.answer }).from(problems).where(eq(problems.id, item.problemId));
-  const result = await gradeAttempt(problem.type, problem.answer, body.answer);
+  const [problem] = await db.select({ type: problems.type, answer: problems.answer, difficulty: problems.difficulty }).from(problems).where(eq(problems.id, item.problemId));
+  const result = await gradeAttempt(problem.type, problem.answer, body.answer, problem.difficulty);
   if (result.status !== "graded") return result;
 
   const hintsUsed = item.hintsRevealed;

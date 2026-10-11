@@ -15,7 +15,7 @@ submitAttemptRoute.post("/", async (c) => {
   const problem = await findProblemForGrading(parsed.data.problemId);
   if (!problem) return c.json({ error: "problem_not_found" }, 404);
 
-  const result = await gradeAttempt(problem.type, problem.answer, parsed.data.answer);
+  const result = await gradeAttempt(problem.type, problem.answer, parsed.data.answer, problem.difficulty);
   if (result.status === "unsupported") {
     return c.json({ error: "unsupported_problem_type" }, 422);
   }

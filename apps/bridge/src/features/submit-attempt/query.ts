@@ -5,7 +5,7 @@ import type { SubmitAttemptBody } from "./schema";
 
 export async function findProblemForGrading(id: string) {
   const rows = await db
-    .select({ type: problems.type, answer: problems.answer })
+    .select({ type: problems.type, answer: problems.answer, difficulty: problems.difficulty })
     .from(problems)
     .where(eq(problems.id, id))
     .limit(1);

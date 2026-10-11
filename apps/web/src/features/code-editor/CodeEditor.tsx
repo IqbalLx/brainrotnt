@@ -14,6 +14,8 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   /** Ctrl or Cmd with Enter. */
   onSubmit: () => void;
+  /** Runs the disclosed tests without submitting. */
+  onTry?: () => void;
   readOnly: boolean;
   label: string;
 }
@@ -43,12 +45,12 @@ const highlighting = HighlightStyle.define([
 
 const languageExtension = (language: CodeLanguage): Extension => (language === "python" ? python() : javascript());
 
-export default function CodeEditor({ language, value, onChange, onSubmit, readOnly, label }: CodeEditorProps) {
+export default function CodeEditor({ language, value, onChange, onSubmit, onTry, readOnly, label }: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   // The editor is created once per language; callbacks are read through refs so it never has to be rebuilt for them.
-  const callbacks = useRef({ onChange, onSubmit });
-  callbacks.current = { onChange, onSubmit };
+  const callbacks = useRef({ onChange, onSubmit, onTry });
+  callbacks.current = { onChange, onSubmit, onTry };
 
   useEffect(() => {
     if (!host.current) return;
@@ -71,6 +73,7 @@ export default function CodeEditor({ language, value, onChange, onSubmit, readOn
           EditorView.contentAttributes.of({ "aria-label": label, "aria-describedby": "code-editor-help" }),
           keymap.of([
             { key: "Mod-Enter", run: () => (callbacks.current.onSubmit(), true) },
+            { key: "Mod-'", run: () => (callbacks.current.onTry?.(), true) },
             indentWithTab,
             ...defaultKeymap,
             ...historyKeymap,
