@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_SETTINGS, effectiveTier, parseStoredSettings, setDifficultyBound } from "./settings";
+import { DEFAULT_SETTINGS, effectiveTier, parseStoredSettings, setDifficultyBound, toggleSubject } from "./settings";
 
 describe("setDifficultyBound", () => {
   test("clicking outside the range extends it", () => {
@@ -46,22 +46,45 @@ describe("effectiveTier", () => {
 });
 
 describe("parseStoredSettings", () => {
-  test("round-trips valid settings", () => {
-    const stored = { subject: "physics", minDifficulty: 2, maxDifficulty: 4, calculator: "none" };
-    expect(parseStoredSettings(JSON.stringify(stored))).toEqual(stored as never);
+  const valid = { subjects: ["physics", "math"], minDifficulty: 2, maxDifficulty: 4, calculator: "none", sessionSize: 10 };
+
+  test("reads valid settings, keeping subjects in their usual order", () => {
+    expect(parseStoredSettings(JSON.stringify(valid))).toEqual({ ...valid, subjects: ["math", "physics"] } as never);
   });
 
-  test("the code subject is remembered", () => {
-    const stored = { subject: "code", minDifficulty: 1, maxDifficulty: 3, calculator: "none" };
-    expect(parseStoredSettings(JSON.stringify(stored))).toEqual(stored as never);
+  test("an unknown session size falls back to the default size only", () => {
+    expect(parseStoredSettings(JSON.stringify({ ...valid, sessionSize: 7 })).sessionSize).toBe(5);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, sessionSize: undefined })).subjects).toEqual(["math", "physics"]);
+  });
+
+  test("v1 settings with one subject are upgraded", () => {
+    const v1 = { subject: "code", minDifficulty: 1, maxDifficulty: 3, calculator: "basic" };
+    expect(parseStoredSettings(null, JSON.stringify(v1))).toEqual({ subjects: ["code"], minDifficulty: 1, maxDifficulty: 3, calculator: "basic", sessionSize: 5 });
+  });
+
+  test("v2 settings win over v1", () => {
+    expect(parseStoredSettings(JSON.stringify(valid), JSON.stringify({ subject: "code", minDifficulty: 1, maxDifficulty: 3, calculator: "basic" })).subjects).toEqual(["math", "physics"]);
   });
 
   test("falls back to defaults for anything invalid", () => {
     expect(parseStoredSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings("not json")).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ subject: "history", minDifficulty: 1, maxDifficulty: 5, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 4, maxDifficulty: 2, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 0, maxDifficulty: 9, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 1, maxDifficulty: 5, calculator: "graphing" }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, subjects: [] }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, subjects: ["history"] }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, minDifficulty: 4, maxDifficulty: 2 }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, minDifficulty: 0, maxDifficulty: 9 }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ ...valid, calculator: "graphing" }))).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe("toggleSubject", () => {
+  test("adds in the usual order, removes, and never empties the selection", () => {
+    expect(toggleSubject(["physics"], "math")).toEqual(["math", "physics"]);
+    expect(toggleSubject(["math", "physics"], "math")).toEqual(["physics"]);
+    expect(toggleSubject(["physics"], "physics")).toEqual(["physics"]);
+  });
+
+  test("STEM is the default", () => {
+    expect(DEFAULT_SETTINGS.subjects).toEqual(["math", "stats", "physics", "code"]);
   });
 });

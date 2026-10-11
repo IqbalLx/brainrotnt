@@ -92,12 +92,11 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `POST /api/sessions/:id/end` | end the session early; unanswered questions earn nothing |
 | `GET /api/sessions/:id/score` | the score screen, once the session has ended |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
-| `GET /api/session-summary?since=<ISO time>` | attempts, correct, accuracy and a per-subject breakdown since that time |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
 
 ## Settings
 
-The bar above the problem sets the subject (Math, Stats, Physics or Code), a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+The bar above the problem sets the subjects a session draws from (toggle any of Math, Stats, Physics and Code; at least one stays on), the number of questions per session (3, 5, 10, 15 or 20), a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage and apply to the next session. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
 
 ## Adding problems with Claude Code
 
@@ -174,9 +173,18 @@ Problems that allow a calculator show a panel under the card. The tier is enforc
 
 Assignments, matrices, ranges, units, strings, comparisons and modulo are never allowed. Keys above the tier are shown disabled rather than removed. After `+` or `-`, a percentage is of the left side, as on a handheld calculator (`200+10%` is `220`). When you use the calculator on a problem, the attempt is recorded with `toolsUsed: ["calculator"]`. The maths library loads only when a calculator is first shown.
 
-## Runs and the session summary
+## Runs, sessions and reminders
 
-A run is the stretch where the agent is Working or Blocked. The timer counts through it, pauses when the agent is Done or Idle, and starts again from zero on the next run. When a run ends in Done and you answered at least one problem during it, a session summary is offered: attempts, accuracy, elapsed time and a per-subject breakdown. Dismiss it with the button or Escape; it is not shown again for that run.
+A run is the stretch where the agent is Working or Blocked. The timer counts through it, pauses when the agent is Done or Idle, and starts again from zero on the next run.
+
+When the agent starts a new run (Idle or Done to Working), a session starts by itself, unless one is already open or you are reading a score screen. You can also start one by hand at any time. Reloading the page picks up the open session.
+
+Two reminders pin a banner to the top of the window:
+
+- **Your agent needs you** when it is Blocked: "I'll check the agent" dismisses it until the agent is blocked again.
+- **Your agent is done** when it reaches Done while a session is open: "End session & see score" ends it early and shows the score screen.
+
+Both can be snoozed for 30 seconds, 1, 2 or 5 minutes, and come back when the snooze runs out. Nothing pauses: you can keep answering while a reminder is up. When the last question is resolved, the score screen lists every question with its credit and offers to start another session.
 
 ## Look and feel
 

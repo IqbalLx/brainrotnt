@@ -7,7 +7,6 @@ import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
 import { flagProblemRoute } from "./features/flag-problem/route";
 import { getNextProblemRoute } from "./features/get-next-problem/route";
-import { sessionSummaryRoute } from "./features/session-summary/route";
 import { submitAttemptRoute } from "./features/submit-attempt/route";
 import { answerSessionQuestionRoute } from "./features/answer-session-question/route";
 import { endSessionRoute } from "./features/end-session/route";
@@ -36,7 +35,6 @@ app.route("/api/agent-state/stream", createAgentStateStreamRoute(uhpClient));
 app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
-app.route("/api/session-summary", sessionSummaryRoute);
 for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute]) {
   app.route("/api/sessions", route);
 }
