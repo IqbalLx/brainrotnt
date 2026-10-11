@@ -1,8 +1,8 @@
-import { desc, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, inArray, isNotNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
-import { sessions } from "../../db/schema";
+import { sessionItems, sessions } from "../../db/schema";
 
 export const listSessionsRoute = new Hono();
 
@@ -19,6 +19,15 @@ listSessionsRoute.get("/", async (c) => {
     // Timestamps have one-second resolution, so insertion order breaks ties.
     .orderBy(desc(sessions.endedAt), sql`rowid desc`)
     .limit(parsed.data.limit);
+  // Points are out of the questions answered or skipped, as on the score screen.
+  const counts = rows.length
+    ? await db
+        .select({ sessionId: sessionItems.sessionId, n: count() })
+        .from(sessionItems)
+        .where(and(inArray(sessionItems.sessionId, rows.map((s) => s.id)), isNotNull(sessionItems.outcome)))
+        .groupBy(sessionItems.sessionId)
+    : [];
+  const resolved = new Map(counts.map((row) => [row.sessionId, row.n]));
   return c.json(
     rows.map((s) => ({
       id: s.id,
@@ -29,6 +38,7 @@ listSessionsRoute.get("/", async (c) => {
       endedAt: s.endedAt!.toISOString(),
       endReason: s.endReason,
       score: s.score ?? 0,
+      maxScore: resolved.get(s.id) ?? 0,
     })),
   );
 });

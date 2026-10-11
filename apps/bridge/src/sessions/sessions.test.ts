@@ -196,7 +196,7 @@ describe("the score screen", () => {
     expect((await app.request(`/${view.id}/score`)).status).toBe(409);
   });
 
-  test("totals credit and lists every question, including unanswered ones", async () => {
+  test("totals credit over answered and skipped questions, and lists every question", async () => {
     for (let i = 0; i < 3; i++) await insertProblem({ subject: "math" });
     const view = await started({ size: 3 });
     await db.update(sessionItems).set({ hintsRevealed: 1 }).where(eq(sessionItems.position, 0));
@@ -205,13 +205,34 @@ describe("the score screen", () => {
     await app.request(`/${view.id}/end`, { method: "POST" });
 
     const score = await json(await app.request(`/${view.id}/score`));
-    expect(score).toMatchObject({ endReason: "ended_early", score: 0.75, maxScore: 3, answered: 1, correct: 1 });
+    expect(score).toMatchObject({ endReason: "ended_early", score: 0.75, maxScore: 2, answered: 1, skipped: 1, unanswered: 1, correct: 1 });
     expect(score.items.map((i: any) => [i.outcome, i.credit, i.hintsUsed])).toEqual([
       ["answered", 0.75, 1],
       ["skipped", 0, 0],
       ["unanswered", 0, 0],
     ]);
     expect(score.items[0].statement).toContain("Test statement");
+  });
+
+  test("questions never reached do not count: skip, skip, answer, answer, end early is out of 4", async () => {
+    for (let i = 0; i < 5; i++) await insertProblem({ subject: "math" });
+    const view = await started({ size: 5 });
+    await skip(view.id, 0);
+    await skip(view.id, 1);
+    await answer(view.id, 2, "42");
+    await answer(view.id, 3, "42");
+    await app.request(`/${view.id}/end`, { method: "POST" });
+
+    const score = await json(await app.request(`/${view.id}/score`));
+    expect(score).toMatchObject({ score: 2, maxScore: 4, answered: 2, skipped: 2, unanswered: 1, correct: 2 });
+    expect(score.items).toHaveLength(5);
+  });
+
+  test("a session ended before any answer is out of nothing", async () => {
+    await insertProblem({ subject: "math" });
+    const view = await started();
+    await app.request(`/${view.id}/end`, { method: "POST" });
+    expect(await json(await app.request(`/${view.id}/score`))).toMatchObject({ score: 0, maxScore: 0, answered: 0, skipped: 0, unanswered: 1 });
   });
 });
 
@@ -251,7 +272,7 @@ describe("hints", () => {
 });
 
 describe("explanations", () => {
-  test("are never sent during play, and unlock on the score screen for resolved questions only", async () => {
+  test("are never sent during play, and unlock on the score screen for answered questions only", async () => {
     for (let i = 0; i < 3; i++) await insertProblem({ subject: "math", explanation: `Worked solution ${i}.\n\nAnswer: 42` });
     const view = await started({ size: 3 });
     expect(JSON.stringify(view)).not.toContain("Worked solution");
@@ -263,7 +284,7 @@ describe("explanations", () => {
     const score = await json(await app.request(`/${view.id}/score`));
     expect(score.items.map((i: any) => [i.outcome, i.explanation !== null, i.hasExplanation])).toEqual([
       ["answered", true, true],
-      ["skipped", true, true],
+      ["skipped", false, true],
       ["unanswered", false, true],
     ]);
     expect(score.items[0].explanation).toContain("Answer: 42");
@@ -310,6 +331,15 @@ describe("reviewing past sessions", () => {
     await started();
     const list = await json(await app.request("/"));
     expect(list.map((s: any) => s.id)).toEqual([second.id, first.id]);
-    expect(list[0]).toMatchObject({ endReason: "ended_early", score: 0, size: 1 });
+    expect(list[0]).toMatchObject({ endReason: "ended_early", score: 0, size: 1, maxScore: 0 });
+  });
+
+  test("lists points out of the questions answered or skipped", async () => {
+    for (let i = 0; i < 3; i++) await insertProblem({ subject: "math" });
+    const view = await started({ size: 3 });
+    await answer(view.id, 0, "42");
+    await skip(view.id, 1);
+    await app.request(`/${view.id}/end`, { method: "POST" });
+    expect((await json(await app.request("/")))[0]).toMatchObject({ score: 1, size: 3, maxScore: 2 });
   });
 });

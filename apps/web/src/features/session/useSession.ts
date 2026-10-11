@@ -27,8 +27,11 @@ export interface SessionScore {
   id: string;
   endReason: SessionView["endReason"];
   score: number;
+  /** One point per question answered or skipped; questions never reached are not counted. */
   maxScore: number;
   answered: number;
+  skipped: number;
+  unanswered: number;
   correct: number;
   startedAt: string;
   endedAt: string;

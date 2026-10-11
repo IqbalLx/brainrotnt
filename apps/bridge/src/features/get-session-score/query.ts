@@ -9,8 +9,12 @@ export interface SessionScore {
   startedAt: string;
   endedAt: string;
   score: number;
+  /** One point per question answered or skipped; questions never reached are not counted. */
   maxScore: number;
   answered: number;
+  skipped: number;
+  /** Questions never reached before the session ended; they count for nothing either way. */
+  unanswered: number;
   correct: number;
   subjects: string[];
   /** Time spent on answered questions, in seconds. */
@@ -26,7 +30,7 @@ export interface SessionScore {
     correct: boolean | null;
     credit: number;
     hintsUsed: number;
-    /** Unlocked for answered and skipped questions; a question left unanswered keeps it locked. */
+    /** Unlocked only for answered questions; a skipped or unanswered question keeps it locked. */
     explanation: string | null;
     hasExplanation: boolean;
     type: string;
@@ -69,20 +73,24 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
     correct: row.outcome === "answered" ? row.correct : null,
     credit: row.credit ?? 0,
     hintsUsed: row.hintsRevealed,
-    explanation: row.outcome === null ? null : row.explanation,
+    explanation: row.outcome === "answered" ? row.explanation : null,
     hasExplanation: row.explanation !== null,
     type: row.type,
     secondsSpent: row.secondsSpent,
     answerGiven: row.answerGiven,
   }));
+  const answered = items.filter((item) => item.outcome === "answered").length;
+  const skipped = items.filter((item) => item.outcome === "skipped").length;
   return {
     id: session.id,
     endReason: session.endReason,
     startedAt: session.startedAt.toISOString(),
     endedAt: session.endedAt.toISOString(),
     score: items.reduce((sum, item) => sum + item.credit, 0),
-    maxScore: items.length,
-    answered: items.filter((item) => item.outcome === "answered").length,
+    maxScore: answered + skipped,
+    answered,
+    skipped,
+    unanswered: items.length - answered - skipped,
     correct: items.filter((item) => item.correct === true).length,
     subjects: [...new Set(items.map((item) => item.subject))],
     secondsSpent: Math.round(items.reduce((sum, item) => sum + (item.secondsSpent ?? 0), 0) * 10) / 10,

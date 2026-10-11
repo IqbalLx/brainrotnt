@@ -10,6 +10,8 @@ export interface SessionSummaryRow {
   endedAt: string;
   endReason: SessionScore["endReason"];
   score: number;
+  /** Questions answered or skipped, which the points are out of. */
+  maxScore: number;
 }
 
 type State =
