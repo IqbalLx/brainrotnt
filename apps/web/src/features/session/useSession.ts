@@ -40,6 +40,8 @@ export interface SessionScore {
     correct: boolean | null;
     credit: number;
     hintsUsed: number;
+    explanation: string | null;
+    hasExplanation: boolean;
   }[];
 }
 

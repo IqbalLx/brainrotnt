@@ -289,3 +289,23 @@ describe("hints", () => {
     expect(listed).toEqual([expect.objectContaining({ id: row.id, inRotation: true, flags: [expect.objectContaining({ reason: expect.stringContaining("review:") })] })]);
   });
 });
+
+describe("explanations", () => {
+  test("are stored when the Answer line agrees with the key", async () => {
+    const result = await submitProblems([numericSpec({ explanation: "Six sevens: $6 \\times 7$.\n\nAnswer: 42" })]);
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(problems);
+    expect(row.explanation).toContain("$6 \\times 7$");
+  });
+
+  test("are rejected without an Answer line, or when it disagrees", async () => {
+    const missing = await submitProblems([numericSpec({ explanation: "Six sevens make forty-two." })]);
+    expect((missing.results[0] as any).errors[0]).toContain("must end with a line 'Answer: <value>'");
+    const wrong = await submitProblems([mcqSpec({ explanation: "Speed is a scalar.\n\nAnswer: A" })]);
+    expect((wrong.results[0] as any).errors[0]).toContain("picks option 0 but the key is 2");
+  });
+
+  test("code explanations need no Answer line", async () => {
+    expect((await submitProblems([codeSpec({ explanation: "Filter the even numbers, then sum them." })])).inserted).toBe(1);
+  });
+});

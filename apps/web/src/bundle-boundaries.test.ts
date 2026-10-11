@@ -42,4 +42,15 @@ describe("bundle boundaries", () => {
     );
     expect(importers).toEqual([]);
   });
+
+  test("the Markdown and KaTeX renderer is only loaded lazily", () => {
+    const offenders = files.filter(
+      (file) =>
+        /from\s+["'](react-markdown|rehype-katex|remark-math|katex)/.test(readFileSync(join(SRC, file), "utf8")) &&
+        !file.endsWith("explanation/Markdown.tsx"),
+    );
+    expect(offenders).toEqual([]);
+    const importers = files.filter((file) => /from\s+["'][^"']*\/Markdown["']/.test(readFileSync(join(SRC, file), "utf8")));
+    expect(importers).toEqual([]);
+  });
 });

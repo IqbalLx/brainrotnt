@@ -22,6 +22,9 @@ export interface SessionScore {
     correct: boolean | null;
     credit: number;
     hintsUsed: number;
+    /** Unlocked for answered and skipped questions; a question left unanswered keeps it locked. */
+    explanation: string | null;
+    hasExplanation: boolean;
   }[];
 }
 
@@ -36,6 +39,7 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
       subject: problems.subject,
       topic: problems.topic,
       statement: problems.statement,
+      explanation: problems.explanation,
       correct: attempts.correct,
     })
     .from(sessionItems)
@@ -54,6 +58,8 @@ export async function getSessionScore(session: SessionRow & { endedAt: Date }): 
     correct: row.outcome === "answered" ? row.correct : null,
     credit: row.credit ?? 0,
     hintsUsed: row.hintsRevealed,
+    explanation: row.outcome === null ? null : row.explanation,
+    hasExplanation: row.explanation !== null,
   }));
   return {
     id: session.id,

@@ -2,6 +2,7 @@ import { checkEquivalent, verifyKeyAgainstPoints } from "@brainrotnt/math-engine
 import { z } from "zod";
 import { runPython, type SandboxResult } from "../infra/sandbox-runner";
 import type { CodeSpec, ProblemSpec } from "./problem-spec";
+import { explanationIssues } from "./explanation";
 import { hintLeaks, hintReviewNotes, keyedProblem } from "./hints";
 import { describeTestFailure, runTests, type TestReport } from "./run-tests";
 
@@ -35,11 +36,14 @@ const EPSILON = 1e-9;
 
 export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> {
   const key = await verifyKey(spec);
-  if (!key.ok || !spec.hints) return key;
+  if (!key.ok) return key;
   const keyed = keyedProblem(spec);
-  const leaks = await hintLeaks(keyed, spec.hints);
-  if (leaks.length > 0) return { ok: false, error: leaks.join("; ") };
-  return { ok: true, notes: hintReviewNotes(keyed, spec.hints) };
+  const issues = [
+    ...(spec.hints ? await hintLeaks(keyed, spec.hints) : []),
+    ...(spec.explanation ? explanationIssues(keyed, spec.explanation) : []),
+  ];
+  if (issues.length > 0) return { ok: false, error: issues.join("; ") };
+  return { ok: true, notes: spec.hints ? hintReviewNotes(keyed, spec.hints) : [] };
 }
 
 async function verifyKey(spec: ProblemSpec): Promise<VerifyResult> {

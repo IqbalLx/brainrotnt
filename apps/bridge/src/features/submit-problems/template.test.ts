@@ -195,3 +195,16 @@ def generate(seed):
     expect(errorsOf(result)).toContain("a hint uses a {placeholder}");
   });
 });
+
+describe("template explanations", () => {
+  test("use the placeholders and {answer}, and are checked per variant", async () => {
+    const ok = await submitProblems([template({ explanation: "Multiply {a} by {b}.\n\nAnswer: {answer}" })]);
+    expect(ok.inserted).toBe(1);
+    const rows = await db.select().from(problems);
+    for (const row of rows) expect(row.explanation).toMatch(/Answer: \d+$/);
+
+    await resetDb();
+    const wrong = await submitProblems([template({ explanation: "Multiply.\n\nAnswer: {a}" })]);
+    expect(errorsOf(wrong)).toContain("does not match the key");
+  });
+});

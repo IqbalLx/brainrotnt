@@ -248,3 +248,23 @@ describe("hints", () => {
     expect((await reveal(view.id, 0)).status).toBe(409);
   });
 });
+
+describe("explanations", () => {
+  test("are never sent during play, and unlock on the score screen for resolved questions only", async () => {
+    for (let i = 0; i < 3; i++) await insertProblem({ subject: "math", explanation: `Worked solution ${i}.\n\nAnswer: 42` });
+    const view = await started({ size: 3 });
+    expect(JSON.stringify(view)).not.toContain("Worked solution");
+    await answer(view.id, 0, "42");
+    expect(JSON.stringify(await json(await app.request("/current")))).not.toContain("Worked solution");
+    await skip(view.id, 1);
+    await app.request(`/${view.id}/end`, { method: "POST" });
+
+    const score = await json(await app.request(`/${view.id}/score`));
+    expect(score.items.map((i: any) => [i.outcome, i.explanation !== null, i.hasExplanation])).toEqual([
+      ["answered", true, true],
+      ["skipped", true, true],
+      ["unanswered", false, true],
+    ]);
+    expect(score.items[0].explanation).toContain("Answer: 42");
+  });
+});

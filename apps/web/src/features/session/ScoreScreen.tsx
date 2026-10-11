@@ -2,6 +2,7 @@ import { Check, Minus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Explanation } from "../explanation/Explanation";
 import { END_REASON_LABEL, formatPoints, SUBJECT_LABEL } from "./format";
 import type { SessionScore } from "./useSession";
 
@@ -41,6 +42,7 @@ export function ScoreScreen({ score, onStartAnother, agentWorking }: { score: Se
                   {SUBJECT_LABEL[item.subject] ?? item.subject} · {item.topic}
                   {item.hintsUsed > 0 && ` · ${item.hintsUsed} ${item.hintsUsed === 1 ? "hint" : "hints"}`}
                 </p>
+                <Explanation source={item.explanation} locked={item.hasExplanation && item.explanation === null} />
               </div>
               <span className="shrink-0 text-body-sm text-ink">{formatPoints(item.credit)}</span>
             </li>
