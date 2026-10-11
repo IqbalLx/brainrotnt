@@ -1,5 +1,5 @@
 import { all, create, type MathNode } from "mathjs";
-import { CALCULATOR_TIERS, type CalculatorTier } from "../settings/settings";
+import { type CalculatorTier } from "./tiers";
 
 /*
  * A problem's calculator tier is enforced here, not hidden in the UI. Two layers:
@@ -62,7 +62,6 @@ math.import(
 // Exported so the tests can show layer 1 holds even if a syntax tree slipped past layer 2.
 export const restrictedMath = math;
 
-export const tierRank = (tier: CalculatorTier) => CALCULATOR_TIERS.indexOf(tier);
 
 interface TierRules {
   operators: string[];

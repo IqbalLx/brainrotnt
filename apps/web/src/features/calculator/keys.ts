@@ -1,4 +1,4 @@
-import type { CalculatorTier } from "../settings/settings";
+import type { CalculatorTier } from "@brainrotnt/math-engine";
 
 export interface CalcKey {
   label: string;

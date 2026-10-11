@@ -60,6 +60,8 @@ apps/
   web/                 Vite + React + TypeScript + Tailwind + shadcn-style components
     src/features/      UI feature folders
     src/components/ui/ shadcn components
+packages/
+  math-engine/         the hardened maths engine shared by the calculator and answer grading
 ```
 
 ## How answers are graded
