@@ -1,14 +1,16 @@
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { Scheme } from "./colorScheme";
 
 // Fonts are copied into /excalidraw/fonts at build time, so nothing is fetched from a CDN.
 (window as unknown as { EXCALIDRAW_ASSET_PATH: string }).EXCALIDRAW_ASSET_PATH = "/excalidraw/";
 
 // A throwaway canvas: no initial scene, nothing saved, nothing loaded. It lives and dies with the problem.
-export default function DrawingBoard({ scheme, onDraw }: { scheme: Scheme; onDraw: () => void }) {
+export default function DrawingBoard({ scheme, onDraw, onApi }: { scheme: Scheme; onDraw: () => void; onApi?: (api: ExcalidrawImperativeAPI) => void }) {
   return (
     <Excalidraw
+      excalidrawAPI={onApi}
       theme={scheme}
       autoFocus={false}
       handleKeyboardGlobally={false}
