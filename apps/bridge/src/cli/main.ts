@@ -5,6 +5,7 @@ import type { StaticAssets } from "../infra/static-assets";
 import { HELP, parseArgs } from "./args";
 import { doctor, setupClaude, uninstall, update } from "./commands";
 import { paths } from "./paths";
+import { setupSandbox } from "./sandbox-setup";
 import { start } from "./start";
 import { red } from "./ui";
 
@@ -29,6 +30,9 @@ export async function run(embedded: Embedded, argv = process.argv.slice(2)): Pro
       break;
     case "setup-claude":
       code = await setupClaude(where, embedded.skill);
+      break;
+    case "setup-sandbox":
+      code = await setupSandbox(command);
       break;
     case "update":
       code = await update(where, embedded.version, command.force);

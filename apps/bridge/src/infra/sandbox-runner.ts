@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -65,12 +66,26 @@ export function getSandboxMode(): Promise<SandboxMode> {
   return probe;
 }
 
+/**
+ * Ubuntu 23.10 and later let AppArmor deny unprivileged user namespaces to any program without a profile
+ * that allows them, which is what makes `unshare -rn` fail there. The setting stays on after a profile is
+ * added, so it only explains a failed probe.
+ */
+export function appArmorRestrictsUserNamespaces(): boolean {
+  try {
+    return readFileSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns", "utf8").trim() === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** What to tell the person when reference and code answers cannot run isolated; null when they can. */
 export function sandboxWarning(mode: SandboxMode): string | null {
   if (mode === "unavailable") {
-    return Bun.which("python3")
-      ? "network isolation is unavailable: reference solutions and code answers will not run. Set BRAINROTNT_ALLOW_UNSANDBOXED=1 to run them without it."
-      : "python3 was not found: reference solutions and Python code answers will not run.";
+    if (!Bun.which("python3")) return "python3 was not found: reference solutions and Python code answers will not run.";
+    return appArmorRestrictsUserNamespaces()
+      ? "network isolation is blocked by AppArmor (Ubuntu 23.10+ restricts user namespaces): reference solutions and code answers will not run. Run brnt setup sandbox to allow it for brainrotnt only."
+      : "network isolation is unavailable: reference solutions and code answers will not run. Set BRAINROTNT_ALLOW_UNSANDBOXED=1 to run them without it.";
   }
   if (mode === "unsandboxed-allowed") return "running reference solutions and code answers WITHOUT network isolation (BRAINROTNT_ALLOW_UNSANDBOXED=1).";
   return null;

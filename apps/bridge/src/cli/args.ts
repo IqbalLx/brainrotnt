@@ -4,6 +4,7 @@ export type Command =
   | { name: "start"; port: number | null; network: boolean; open: boolean; allowRemoteCode: boolean }
   | { name: "doctor" }
   | { name: "setup-claude" }
+  | { name: "setup-sandbox"; check: boolean }
   | { name: "update"; force: boolean }
   | { name: "uninstall"; purge: boolean; yes: boolean }
   | { name: "version" }
@@ -16,6 +17,7 @@ Usage:
   brnt [options]           start brainrotnt and print its link (same as brainrotnt)
   brnt doctor              check the installation, Python, the sandbox, Luvus and Claude Code
   brnt setup claude        register the MCP server with Claude Code and install the problem skill
+  brnt setup sandbox       on Linux, let brainrotnt isolate code answers where AppArmor blocks it (sudo)
   brnt update [--force]    install the latest release; your data is kept
   brnt uninstall [--purge] remove the app (--purge also deletes your data)
   brnt version             print the version
@@ -39,8 +41,10 @@ export function parseArgs(argv: string[]): Command {
     case "doctor":
       return rest.length ? unexpected(rest[0]) : { name: "doctor" };
     case "setup":
-      if (rest[0] !== "claude" || rest.length > 1) return { name: "error", message: "usage: brnt setup claude" };
-      return { name: "setup-claude" };
+      if (rest[0] === "claude" && rest.length === 1) return { name: "setup-claude" };
+      // --check is for the command itself: it starts a new process to see whether a just-loaded profile works.
+      if (rest[0] === "sandbox" && rest.slice(1).every((a) => a === "--check")) return { name: "setup-sandbox", check: rest.includes("--check") };
+      return { name: "error", message: "usage: brnt setup claude | brnt setup sandbox" };
     case "update":
       return rest.every((a) => a === "--force") ? { name: "update", force: rest.includes("--force") } : unexpected(rest.find((a) => a !== "--force")!);
     case "uninstall": {
