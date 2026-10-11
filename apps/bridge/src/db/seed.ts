@@ -1,6 +1,7 @@
+import { verifyKeyAgainstPoints } from "@brainrotnt/math-engine";
 import { statementHash } from "../content/hash";
 import { db } from "./client";
-import { mcqAnswer, numericAnswer } from "./answer";
+import { mcqAnswer, numericAnswer, symbolicAnswer } from "./answer";
 import { problems } from "./schema";
 
 type Subject = "math" | "stats" | "physics";
@@ -15,6 +16,7 @@ interface Seed {
   tools: Tools;
   mcq?: { options: string[]; correct: number };
   numeric?: { value: number; tolerance: number; unit?: string };
+  symbolic?: { expression: string; variables: string[]; points?: number[]; reference: (x: number) => number };
 }
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -22,6 +24,7 @@ const sampleSd = (xs: number[]) => {
   const m = mean(xs);
   return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
 };
+const derivative = (f: (x: number) => number) => (x: number) => (f(x + 1e-5) - f(x - 1e-5)) / 2e-5;
 const factorial = (n: number): number => (n <= 1 ? 1 : n * factorial(n - 1));
 
 const SEEDS: Seed[] = [
@@ -141,11 +144,55 @@ const SEEDS: Seed[] = [
     tools: { calculator: "scientific", draw: true },
     numeric: { value: Math.sqrt((2 * 20) / 9.8), tolerance: 0.01, unit: "s" },
   },
+  {
+    id: "math-calculus-002",
+    subject: "math",
+    topic: "derivatives",
+    difficulty: 2,
+    statement: "Differentiate f(x) = x^3 + 2x with respect to x. Answer in terms of x.",
+    tools: { calculator: "none", draw: true },
+    symbolic: { expression: "3*x^2 + 2", variables: ["x"], reference: derivative((x) => x ** 3 + 2 * x) },
+  },
+  {
+    id: "math-algebra-002",
+    subject: "math",
+    topic: "algebra",
+    difficulty: 2,
+    statement: "Expand (x + 3)^2. Answer in terms of x.",
+    tools: { calculator: "none", draw: false },
+    symbolic: { expression: "x^2 + 6*x + 9", variables: ["x"], reference: (x) => (x + 3) * (x + 3) },
+  },
+  {
+    id: "math-algebra-003",
+    subject: "math",
+    topic: "algebra",
+    difficulty: 2,
+    statement: "Simplify (x^2 - 9) / (x - 3), for x not equal to 3. Answer in terms of x.",
+    tools: { calculator: "none", draw: false },
+    symbolic: { expression: "x + 3", variables: ["x"], points: [0.5, 1, 1.5, 2, 2.5, 4], reference: (x) => (x * x - 9) / (x - 3) },
+  },
+  {
+    id: "math-calculus-003",
+    subject: "math",
+    topic: "derivatives",
+    difficulty: 3,
+    statement: "Differentiate f(x) = sin(2x) with respect to x. Answer in terms of x.",
+    tools: { calculator: "scientific", draw: true },
+    symbolic: { expression: "2*cos(2*x)", variables: ["x"], reference: derivative((x) => Math.sin(2 * x)) },
+  },
 ];
 
+function symbolicAnswerFor(seed: Seed) {
+  const { expression, variables, points = [0.5, 1, 1.5, 2, 2.5, 3], reference } = seed.symbolic!;
+  // A key is only inserted if it reproduces values computed independently of it.
+  const verdict = verifyKeyAgainstPoints(expression, variables, points.map((x) => ({ vars: { x }, value: reference(x) })));
+  if (!verdict.ok) throw new Error(`seed ${seed.id}: ${verdict.error}`);
+  return symbolicAnswer.parse({ expression, variables });
+}
+
 const rows = SEEDS.map((seed) => {
-  const type: "mcq" | "numeric" = seed.mcq ? "mcq" : "numeric";
-  const answer = seed.mcq ? mcqAnswer.parse(seed.mcq) : numericAnswer.parse(seed.numeric);
+  const type: "mcq" | "numeric" | "symbolic" = seed.mcq ? "mcq" : seed.symbolic ? "symbolic" : "numeric";
+  const answer = seed.mcq ? mcqAnswer.parse(seed.mcq) : seed.symbolic ? symbolicAnswerFor(seed) : numericAnswer.parse(seed.numeric);
   return {
     id: seed.id,
     version: 1,

@@ -69,3 +69,24 @@ export function mcqSpec(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+export function symbolicSpec(overrides: Record<string, unknown> = {}) {
+  return {
+    subject: "math",
+    topic: "derivatives",
+    difficulty: 2,
+    type: "symbolic",
+    statement: `Differentiate f(x) = x^3 + 2x with respect to x, in test case ${unique()}.`,
+    tools: { calculator: "none", draw: false },
+    answer: { expression: "3*x^2 + 2", variables: ["x"] },
+    reference: {
+      code: [
+        "import json",
+        "f = lambda x: x**3 + 2*x",
+        "h = 1e-5",
+        'print(json.dumps({"points": [{"vars": {"x": x}, "value": (f(x + h) - f(x - h)) / (2 * h)} for x in [0.5, 1, 1.5, 2, 2.5, 3]]}))',
+      ].join("\n"),
+    },
+    ...overrides,
+  };
+}
