@@ -28,8 +28,6 @@ function saveSnap(snap: Snap) {
   }
 }
 
-const wide = () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
-
 interface DrawingBoardPanelProps {
   /** Pinned in the sheet's header once it covers the problem. */
   statement: string;
@@ -45,8 +43,9 @@ export function DrawingBoardPanel({ statement, calculator, onDraw }: DrawingBoar
   const [opened, setOpened] = useState(false);
   const [visible, setVisible] = useState(false);
   const [snap, setSnap] = useState<Snap>(savedSnap);
-  // Beside the board on a wide screen; on a phone it takes the board's place while shown.
-  const [showCalculator, setShowCalculator] = useState(wide);
+  // Off until asked for, so the board gets the whole sheet. Shown, it sits beside the board on a wide
+  // screen; on a phone it takes the board's place.
+  const [showCalculator, setShowCalculator] = useState(false);
   const api = useRef<ExcalidrawImperativeAPI | null>(null);
   const refresh = useCallback(() => api.current?.refresh(), []);
 
