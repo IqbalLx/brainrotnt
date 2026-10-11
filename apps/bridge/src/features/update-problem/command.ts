@@ -1,6 +1,6 @@
 import { and, eq, ne } from "drizzle-orm";
 import { statementHash } from "../../content/hash";
-import { issuesOf, problemSpec, semanticIssues, storedAnswer } from "../../content/problem-spec";
+import { issuesOf, parseProblemSpec, semanticIssues, storedAnswer } from "../../content/problem-spec";
 import { verifyReference } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
@@ -16,7 +16,7 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
     return { ok: false, errors: [`problem ${id} was already replaced by a newer version; update that one instead`] };
   }
 
-  const parsed = problemSpec.safeParse(raw);
+  const parsed = parseProblemSpec(raw);
   if (!parsed.success) return { ok: false, errors: issuesOf(parsed.error) };
   const spec = parsed.data;
   const issues = semanticIssues(spec);
@@ -52,7 +52,8 @@ export async function updateProblem(id: string, raw: unknown): Promise<UpdateRes
         answer: storedAnswer(spec),
         hints: spec.hints ?? null,
         explanation: spec.explanation ?? null,
-        verificationStatus: "verified",
+        sources: spec.subject === "trivia" ? spec.sources : null,
+        verificationStatus: verdict.status ?? "verified",
         source: spec.source ?? existing.source,
         statementHash: hash,
         createdAt: new Date(),

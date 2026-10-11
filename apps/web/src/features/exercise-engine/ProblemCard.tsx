@@ -102,6 +102,11 @@ function ActiveProblem({
           <div className="flex items-center">
             <Badge variant="brand">{problem.subject}</Badge>
             <DifficultyDots value={problem.difficulty} />
+            {problem.unverified && (
+              <Badge variant="blocked" className="ml-3" title="Fewer than two independent sources confirm this fact. Flag it if it looks wrong.">
+                Unverified
+              </Badge>
+            )}
           </div>
           <Button variant={flagged ? "flagged" : "outline"} size="sm" disabled={flagged} onClick={onFlag}>
             <Flag className="size-4" aria-hidden />
@@ -146,7 +151,7 @@ function ActiveProblem({
 
           <div className="flex items-center gap-3">
             {phase === "result" ? (
-              <Button type="button" autoFocus onClick={onNext}>
+              <Button key="next" type="button" autoFocus onClick={onNext}>
                 {nextLabel}
               </Button>
             ) : (

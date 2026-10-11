@@ -12,6 +12,8 @@ export interface Problem {
   variables: string[] | null;
   code: CodeView | null;
   tools: { calculator: "none" | "basic" | "scientific" | "stats"; draw: boolean };
+  /** Trivia confirmed by fewer than two independent sources. */
+  unverified?: boolean;
 }
 
 export interface AttemptResult {

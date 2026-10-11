@@ -3,7 +3,7 @@ import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite
 export const problems = sqliteTable("problems", {
   id: text("id").primaryKey(),
   version: integer("version").notNull().default(1),
-  subject: text("subject", { enum: ["math", "stats", "physics", "code"] }).notNull(),
+  subject: text("subject", { enum: ["math", "stats", "physics", "code", "trivia"] }).notNull(),
   topic: text("topic").notNull(),
   difficulty: integer("difficulty").notNull(),
   type: text("type", { enum: ["mcq", "numeric", "symbolic", "code"] }).notNull(),
@@ -14,6 +14,8 @@ export const problems = sqliteTable("problems", {
   hints: text("hints", { mode: "json" }).$type<string[]>(),
   // Markdown with KaTeX; only ever sent on the score screen, after the session.
   explanation: text("explanation"),
+  // Trivia only: where the fact comes from, as {url, title?, quote}.
+  sources: text("sources", { mode: "json" }).$type<{ url: string; title?: string; quote: string }[]>(),
   verificationStatus: text("verification_status", {
     enum: ["verified", "unverified", "flagged", "retired"],
   })

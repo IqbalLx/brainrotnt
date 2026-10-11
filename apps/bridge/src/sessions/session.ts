@@ -3,7 +3,7 @@ import { toProblemView, type ProblemView } from "../content/problem-view";
 import { db } from "../db/client";
 import { problems, sessionItems, sessions } from "../db/schema";
 
-export const SESSION_SUBJECTS = ["math", "stats", "physics", "code"] as const;
+export const SESSION_SUBJECTS = ["math", "stats", "physics", "code", "trivia"] as const;
 export const HINT_PENALTY = 0.25;
 
 // Each hint opened takes a quarter off a correct answer; a wrong or skipped answer earns nothing.
@@ -25,7 +25,7 @@ export interface SessionView {
   /** Position of the question being answered, or null once every question is resolved or the session ended. */
   position: number | null;
   items: { position: number; outcome: ItemRow["outcome"]; credit: number | null }[];
-  current: (ProblemView & { hintsRevealed: number; hintCount: number; hints: string[] }) | null;
+  current: (ProblemView & { hintsRevealed: number; hintCount: number; hints: string[]; unverified: boolean }) | null;
 }
 
 const problemColumns = {
@@ -63,10 +63,13 @@ export async function sessionView(session: SessionRow): Promise<SessionView> {
   const item = currentItem(session, items);
   let current: SessionView["current"] = null;
   if (item) {
-    const [row] = await db.select({ ...problemColumns, hints: problems.hints }).from(problems).where(eq(problems.id, item.problemId));
-    const { hints, ...problem } = row;
+    const [row] = await db
+      .select({ ...problemColumns, hints: problems.hints, status: problems.verificationStatus })
+      .from(problems)
+      .where(eq(problems.id, item.problemId));
+    const { hints, status, ...problem } = row;
     // Only the hints already opened leave the server.
-    current = { ...toProblemView(problem), hintsRevealed: item.hintsRevealed, hintCount: hints?.length ?? 0, hints: (hints ?? []).slice(0, item.hintsRevealed) };
+    current = { ...toProblemView(problem), hintsRevealed: item.hintsRevealed, hintCount: hints?.length ?? 0, hints: (hints ?? []).slice(0, item.hintsRevealed), unverified: status === "unverified" };
   }
   return {
     id: session.id,

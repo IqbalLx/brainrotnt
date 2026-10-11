@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { expandTemplate } from "../../content/expand-template";
 import { generatedId, statementHash } from "../../content/hash";
-import { isTemplateItem, issuesOf, problemSpec, semanticIssues, storedAnswer, templateSpec, type ProblemSpec } from "../../content/problem-spec";
+import { isTemplateItem, issuesOf, parseProblemSpec, semanticIssues, storedAnswer, templateSpec, type ProblemSpec } from "../../content/problem-spec";
 import { verifyAll } from "../../content/verify-reference";
 import { db } from "../../db/client";
 import { flags, problems } from "../../db/schema";
@@ -9,7 +9,7 @@ import { flags, problems } from "../../db/schema";
 export const MAX_BATCH = 25;
 
 export type ItemResult =
-  | { index: number; status: "inserted"; id: string; ids?: string[]; notes?: string[] }
+  | { index: number; status: "inserted"; id: string; ids?: string[]; notes?: string[]; verification?: "unverified" }
   | { index: number; status: "rejected"; errors: string[] };
 
 export interface SubmitResult {
@@ -42,7 +42,7 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
       templateItems.push({ index, raw });
       return;
     }
-    const parsed = problemSpec.safeParse(raw);
+    const parsed = parseProblemSpec(raw);
     if (!parsed.success) return reject(index, issuesOf(parsed.error));
     const issues = semanticIssues(parsed.data);
     if (issues.length) return reject(index, issues);
@@ -80,17 +80,17 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
   }
 
   const verdicts = await verifyAll(fresh.map((c) => c.spec));
-  const accepted: (Candidate & { notes: string[] })[] = [];
+  const accepted: (Candidate & { notes: string[]; status: "verified" | "unverified" })[] = [];
   fresh.forEach((candidate, i) => {
     const verdict = verdicts[i];
-    if (verdict.ok) accepted.push({ ...candidate, notes: verdict.notes });
+    if (verdict.ok) accepted.push({ ...candidate, notes: verdict.notes, status: verdict.status ?? "verified" });
     else reject(candidate.index, [verdict.error]);
   });
 
   if (accepted.length) {
     const now = new Date();
     db.transaction((tx) => {
-      for (const { spec, hash, id, notes } of accepted) {
+      for (const { spec, hash, id, notes, status } of accepted) {
         tx.insert(problems)
           .values({
             id,
@@ -104,7 +104,8 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
             answer: storedAnswer(spec),
             hints: spec.hints ?? null,
             explanation: spec.explanation ?? null,
-            verificationStatus: "verified",
+            sources: spec.subject === "trivia" ? spec.sources : null,
+            verificationStatus: status,
             source: spec.source ?? null,
             statementHash: hash,
             createdAt: now,
@@ -116,7 +117,9 @@ export async function submitProblems(rawItems: unknown[]): Promise<SubmitResult>
         }
       }
     });
-    for (const { index, id, notes } of accepted) results[index] = { index, status: "inserted", id, ...(notes.length ? { notes } : {}) };
+    for (const { index, id, notes, status } of accepted) {
+      results[index] = { index, status: "inserted", id, ...(status === "unverified" ? { verification: "unverified" as const } : {}), ...(notes.length ? { notes } : {}) };
+    }
   }
 
   let problemsAdded = accepted.length;
