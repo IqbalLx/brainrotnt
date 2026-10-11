@@ -34,15 +34,17 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("MCP endpoint", () => {
-  test("lists the five pipeline tools with descriptions", async () => {
+  test("lists the six pipeline tools with descriptions", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["get_coverage", "get_schema", "list_flagged", "submit_problems", "update_problem"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["get_coverage", "get_schema", "list_flagged", "list_missing_extras", "submit_problems", "update_problem"]);
     for (const tool of tools) expect(tool.description?.length).toBeGreaterThan(20);
   });
 
   test("get_schema returns the problem schema", async () => {
     const { body } = await call("get_schema");
     expect(body.supported.types).toEqual(["mcq", "numeric", "symbolic", "code"]);
+    expect(body.supported.subjects).toContain("trivia");
+    expect(JSON.stringify(body.triviaSpec)).toContain("sources");
     expect(JSON.stringify(body.problemSpec)).toContain("reference");
   });
 
@@ -69,6 +71,19 @@ describe("MCP endpoint", () => {
     expect(repaired.body).toMatchObject({ ok: true, id: `${id}.v2`, version: 2, retired: id });
     expect((await call("list_flagged")).body).toEqual([]);
     expect((await call("get_coverage")).body.total).toBe(1);
+  });
+
+  test("backfill: list_missing_extras finds a problem, update_problem adds hints and an explanation", async () => {
+    const submitted = await call("submit_problems", { problems: [numericSpec({ statement: "What is 6 times 7? Give a whole number, please." })] });
+    const id = submitted.body.results[0].id as string;
+    const missing = (await call("list_missing_extras", {})).body;
+    expect(missing).toMatchObject({ total: 1, problems: [{ id, missing: ["hints", "explanation"] }] });
+
+    const extras = { hints: ["Six groups of seven."], explanation: "Count by sevens six times.\n\nAnswer: 42" };
+    const updated = await call("update_problem", { id, problem: numericSpec({ statement: "What is 6 times 7? Give a whole number, please.", ...extras }) });
+    expect(updated.body).toMatchObject({ ok: true, id: `${id}.v2` });
+    expect((await call("list_missing_extras", { missing: "either" })).body.total).toBe(0);
+    expect((await call("get_coverage")).body).toMatchObject({ missingExtras: 0, rows: [{ missingHints: 0, missingExplanation: 0 }] });
   });
 
   test("a template submitted over MCP expands into computed variants", async () => {

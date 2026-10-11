@@ -107,17 +107,18 @@ The bridge exposes an MCP endpoint, so Claude Code can grow the problem bank usi
 claude mcp add --transport http brainrotnt http://127.0.0.1:8787/mcp
 ```
 
-Then ask for what you want, for example "use brainrotnt to add 5 stats problems on confidence intervals, difficulty 2 to 4". Claude Code gets five tools:
+Then ask for what you want, for example "use brainrotnt to add 5 stats problems on confidence intervals, difficulty 2 to 4". Claude Code gets six tools:
 
 | Tool | Purpose |
 |---|---|
-| `get_schema` | the problem schema, allowed values and limits (it starts here) |
-| `get_coverage` | counts per subject, topic and difficulty, to find gaps |
+| `get_schema` | the problem schemas (STEM, trivia, templates), allowed values and limits (it starts here) |
+| `get_coverage` | counts per subject, topic and difficulty (verified, unverified, flagged, missing hints or explanations), to find gaps |
 | `submit_problems` | verify and insert up to 25 problems; each item comes back inserted or rejected with its errors |
-| `list_flagged` | problems you flagged in the UI, with their key and your reasons |
-| `update_problem` | replace a problem after repair |
+| `list_flagged` | problems you flagged in the UI, with their key and your reasons, plus live problems carrying a review note |
+| `list_missing_extras` | live problems still lacking hints or an explanation, to backfill in small batches |
+| `update_problem` | replace a problem after repair, or with hints and an explanation added (the full problem, verified again) |
 
-The server only accepts what it can verify. Every problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). For a symbolic problem it prints at least 6 independently computed points, `{"points":[{"vars":{"x":1.5},"value":6.75},...]}`, which the stated expression must reproduce (a derivative, for example, is computed by finite differences rather than by re-typing the answer). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
+The server only accepts what it can verify. Every STEM problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). For a symbolic problem it prints at least 6 independently computed points, `{"points":[{"vars":{"x":1.5},"value":6.75},...]}`, which the stated expression must reproduce (a derivative, for example, is computed by finite differences rather than by re-typing the answer). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
 
 For quantitative topics, Claude Code can submit a **template** instead of many hand-written problems: one statement with `{placeholders}` and a seeded Python generator.
 
