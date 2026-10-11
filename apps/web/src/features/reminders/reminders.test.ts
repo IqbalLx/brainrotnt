@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentState } from "../agent-state/useAgentState";
-import { activeReminder, dismiss, initialReminders, nextFinishedAt, snooze } from "./reminders";
+import { activeReminder, dismiss, initialReminders, nextFinishedAt, nextRunStartedAt, snooze } from "./reminders";
 
 const T = "2026-10-11T10:00:00Z";
 
@@ -36,6 +36,33 @@ describe("nextFinishedAt", () => {
     expect(replay([["done", "t1"]])).toBe("t1");
     expect(replay([["idle", "t1"]])).toBeNull();
     expect(replay([["idle", "t1"], ["done", "t2"]])).toBe("t2");
+  });
+});
+
+function replayRun(states: [AgentState, string][]): string | null {
+  let previous: AgentState | null = null;
+  let startedAt: string | null = null;
+  for (const [status, at] of states) {
+    startedAt = nextRunStartedAt(previous, status, at, startedAt);
+    previous = status;
+  }
+  return startedAt;
+}
+
+describe("nextRunStartedAt", () => {
+  test("Idle or Done to Working starts a run, and Blocked in the middle keeps its moment", () => {
+    expect(replayRun([["idle", "t1"], ["working", T]])).toBe(T);
+    expect(replayRun([["done", "t1"], ["working", T], ["blocked", "t3"], ["working", "t4"]])).toBe(T);
+  });
+
+  test("the first state is a baseline, so a page loaded mid-run starts nothing", () => {
+    expect(replayRun([["working", T]])).toBeNull();
+    expect(replayRun([["blocked", "t1"], ["working", T]])).toBeNull();
+  });
+
+  test("finishing clears it, and the next run gets a new moment", () => {
+    expect(replayRun([["idle", "t1"], ["working", T], ["done", "t3"]])).toBeNull();
+    expect(replayRun([["idle", "t1"], ["working", T], ["idle", "t3"], ["working", "t4"]])).toBe("t4");
   });
 });
 
@@ -78,5 +105,29 @@ describe("activeReminder", () => {
     const state = dismiss(initialReminders, { kind: "blocked", since: T });
     expect(activeReminder("blocked", T, null, true, state, 0)).toBeNull();
     expect(activeReminder("blocked", "2026-10-11T10:05:00Z", null, true, state, 0)).not.toBeNull();
+  });
+
+  test("a new run offers a session only while one could start", () => {
+    const offer = { kind: "working" as const, since: T };
+    expect(activeReminder("working", T, null, false, initialReminders, 0, { startedAt: T, canStart: true })).toEqual(offer);
+    expect(activeReminder("working", T, null, true, initialReminders, 0, { startedAt: T, canStart: false })).toBeNull();
+    expect(activeReminder("working", T, null, false, initialReminders, 0, { startedAt: null, canStart: true })).toBeNull();
+    expect(activeReminder("done", T, null, false, initialReminders, 0, { startedAt: T, canStart: true })).toBeNull();
+  });
+
+  test("blocked takes over from the offer, which returns for the same run unless dismissed", () => {
+    const run = { startedAt: T, canStart: true };
+    expect(activeReminder("blocked", "t2", null, false, initialReminders, 0, run)).toEqual({ kind: "blocked", since: "t2" });
+    expect(activeReminder("working", "t3", null, false, initialReminders, 0, run)).toEqual({ kind: "working", since: T });
+    const state = dismiss(initialReminders, { kind: "working", since: T });
+    expect(activeReminder("working", "t3", null, false, state, 0, run)).toBeNull();
+    expect(activeReminder("working", "t5", null, false, state, 0, { startedAt: "t5", canStart: true })).toEqual({ kind: "working", since: "t5" });
+  });
+
+  test("a snoozed offer comes back after the snooze while the run goes on", () => {
+    const run = { startedAt: T, canStart: true };
+    const state = snooze(initialReminders, { kind: "working", since: T }, 30_000, 0);
+    expect(activeReminder("working", T, null, false, state, 29_999, run)).toBeNull();
+    expect(activeReminder("working", T, null, false, state, 30_000, run)).toEqual({ kind: "working", since: T });
   });
 });

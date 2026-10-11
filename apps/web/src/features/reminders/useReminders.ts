@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentState } from "../agent-state/useAgentState";
-import { activeReminder, dismiss, initialReminders, snooze, type ReminderKey, type ReminderState } from "./reminders";
+import { activeReminder, dismiss, initialReminders, snooze, type ReminderKey, type ReminderState, type RunOffer } from "./reminders";
 
-export function useReminders(status: AgentState, since: string | null, finishedAt: string | null, sessionOpen: boolean) {
+export function useReminders(status: AgentState, since: string | null, finishedAt: string | null, sessionOpen: boolean, run: RunOffer) {
   const [state, setState] = useState<ReminderState>(initialReminders);
   const [now, setNow] = useState(() => Date.now());
 
@@ -15,7 +15,7 @@ export function useReminders(status: AgentState, since: string | null, finishedA
     return () => clearTimeout(timer);
   }, [state.snoozed]);
 
-  const reminder = activeReminder(status, since, finishedAt, sessionOpen, state, Math.max(now, Date.now()));
+  const reminder = activeReminder(status, since, finishedAt, sessionOpen, state, Math.max(now, Date.now()), run);
 
   return {
     reminder,

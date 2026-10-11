@@ -247,14 +247,15 @@ Assignments, matrices, ranges, units, strings, comparisons and modulo are never 
 
 A run is the stretch where the agent is Working or Blocked. The timer counts through it, pauses when the agent is Done or Idle, and starts again from zero on the next run.
 
-When the agent starts a new run (Idle or Done to Working), a session starts by itself, unless one is already open or you are reading a score screen. You can also start one by hand at any time. Reloading the page picks up the open session.
+When the agent starts a new run (Idle or Done to Working), the app offers a session instead of starting one, so you can read the agent's first output, or skip a short run such as planning. You can also start one by hand at any time. Reloading the page picks up the open session.
 
-Two reminders pin a banner to the top of the window:
+Three reminders pin a banner to the top of the window:
 
+- **Your agent is on it** when a new run starts and no session is open (and you are not reading a score screen): "Start session" starts one, "Not this run" dismisses it until the next run. It goes away when the run ends, and a Blocked moment in the middle of the run does not bring it back once dismissed.
 - **Your agent needs you** when it is Blocked: "I'll check the agent" dismisses it until the agent is blocked again.
 - **Your agent is done** when it finishes a run (Working to Done, or Working to Idle, which is how Luvus often reports a finished turn) while a session is open: "End session & see score" ends it early and shows the score screen. It stays up when Luvus later moves Done to Idle, until you act on it, snooze it, or the agent starts working again.
 
-Both can be snoozed for 30 seconds, 1, 2 or 5 minutes, and come back when the snooze runs out. Nothing pauses: you can keep answering while a reminder is up. When the last question is resolved, the score screen lists every question with its credit and offers to start another session.
+All three can be snoozed for 30 seconds, 1, 2 or 5 minutes, and come back when the snooze runs out. Nothing pauses: you can keep answering while a reminder is up. When the last question is resolved, the score screen lists every question with its credit and offers to start another session.
 
 ## Look and feel
 

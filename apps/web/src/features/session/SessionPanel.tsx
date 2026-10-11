@@ -55,7 +55,7 @@ export function SessionPanel({ session, settings, agentWorking, onStart }: Sessi
                 Pick more subjects, widen the difficulty range, or run <code className="text-code">bun run db:seed</code>.
               </>
             ) : (
-              "A session starts by itself when your agent starts working, or start one now."
+              "When your agent starts working, you will be offered a session. Or start one now."
             )}
           </CardDescription>
         </CardHeader>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { nextFinishedAt } from "../reminders/reminders";
+import { nextFinishedAt, nextRunStartedAt } from "../reminders/reminders";
 
 export type AgentState = "idle" | "working" | "blocked" | "done";
 
@@ -28,10 +28,11 @@ export function useAgentState() {
   // even while the status stays the same.
   const [since, setSince] = useState<string | null>(null);
   const lastStatus = useRef<AgentState | null>(null);
-  // Counts the agent starting a new run (idle or done -> working). Counted here, as events arrive,
-  // because React may batch two events into one render and hide the transition from an effect.
-  // The first event is only a baseline, so loading the page mid-run does not count.
-  const [runStarts, setRunStarts] = useState(0);
+  // When the current run started (idle or done -> working), for the reminder that offers a session;
+  // null outside a run. Tracked here, as events arrive, because React may batch two events into one
+  // render and hide the transition from an effect. The first event is only a baseline, so loading the
+  // page mid-run starts nothing.
+  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
   // When the agent last finished a run (left Working or Blocked for Idle or Done), for the reminder.
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -61,14 +62,14 @@ export function useAgentState() {
         trace(`id=${id} ${next.status} pane=${next.pane} published ${Date.now() - Date.parse(next.at)} ms ago${gap}`, next);
       }
       if (lastStatus.current !== next.status) setSince(next.at);
-      if ((lastStatus.current === "idle" || lastStatus.current === "done") && next.status === "working") setRunStarts((n) => n + 1);
       const previous = lastStatus.current;
       setFinishedAt((current) => nextFinishedAt(previous, next.status, next.at, current));
+      setRunStartedAt((current) => nextRunStartedAt(previous, next.status, next.at, current));
       lastStatus.current = next.status;
       setEvent(next);
     });
     return () => source.close();
   }, []);
 
-  return { event, status: event?.status ?? "idle", since, finishedAt, runStarts, connected };
+  return { event, status: event?.status ?? "idle", since, finishedAt, runStartedAt, connected };
 }

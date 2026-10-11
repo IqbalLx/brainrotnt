@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { BankPage } from "@/features/bank/BankPage";
 import { useAgentState } from "@/features/agent-state/useAgentState";
 import { ReminderCard } from "@/features/reminders/ReminderCard";
@@ -15,22 +15,16 @@ import { useHealth } from "@/features/shell/useHealth";
 import { useRoute } from "@/features/shell/useRoute";
 
 export default function App() {
-  const { event, status, since, finishedAt, runStarts, connected } = useAgentState();
+  const { event, status, since, finishedAt, runStartedAt, connected } = useAgentState();
   const { settings, update } = useSettings();
   const session = useSession(status);
   const timer = useRunTimer(status);
-  const reminders = useReminders(status, since, finishedAt, session.open);
+  // A new run offers a session rather than starting one, unless one is already open or a score screen
+  // is being read: the agent's first output, or a short planning run, may matter more right then.
+  const canStart = session.phase === "none" || session.phase === "empty";
+  const reminders = useReminders(status, since, finishedAt, session.open, { startedAt: runStartedAt, canStart });
   const health = useHealth();
   const { route, navigate } = useRoute();
-
-  // A session starts by itself when the agent starts a new run, unless one is already open or a
-  // score screen is being read.
-  const handledRunStarts = useRef(0);
-  useEffect(() => {
-    if (runStarts === handledRunStarts.current) return;
-    handledRunStarts.current = runStarts;
-    if (session.phase === "none" || session.phase === "empty") void session.start(settings, "agent");
-  }, [runStarts, session, settings]);
 
   // When a session ends, its review opens.
   const endedId = session.phase === "ended" ? session.score?.id : undefined;
@@ -38,9 +32,9 @@ export default function App() {
     if (endedId) navigate({ page: "review", sessionId: endedId });
   }, [endedId, navigate]);
 
-  const startFromAnywhere = () => {
+  const startFromAnywhere = (startedBy: "agent" | "manual" = "manual") => {
     navigate({ page: "exercise" });
-    void session.start(settings, "manual");
+    void session.start(settings, startedBy);
   };
 
   return (
@@ -68,12 +62,15 @@ export default function App() {
               const reminder = reminders.reminder!;
               reminders.dismiss(reminder);
               if (reminder.kind === "done") void session.end();
+              // "agent": it never replaces a session opened meanwhile in another tab.
+              if (reminder.kind === "working") startFromAnywhere("agent");
             }}
             onSnooze={(ms) => reminders.snooze(reminders.reminder!, ms)}
+            onDismiss={reminders.reminder.kind === "working" ? () => reminders.dismiss(reminders.reminder!) : undefined}
           />
         )}
         {route.page === "review" ? (
-          <ReviewPage sessionId={route.sessionId} refresh={endedId} onStartAnother={startFromAnywhere} />
+          <ReviewPage sessionId={route.sessionId} refresh={endedId} onStartAnother={() => startFromAnywhere()} />
         ) : route.page === "bank" ? (
           <BankPage settings={settings} onSettings={update} />
         ) : (

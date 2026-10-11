@@ -10,9 +10,17 @@ interface ReminderCardProps {
   event: AgentStateEvent | null;
   onAct: () => void;
   onSnooze: (ms: number) => void;
+  /** Lets the reminder go without acting on it; only offered where that makes sense. */
+  onDismiss?: () => void;
 }
 
-const COPY = {
+const COPY: Record<ReminderKey["kind"], { kicker: string; title: string; body: string; act: string }> = {
+  working: {
+    kicker: "Agent working",
+    title: "Your agent is on it",
+    body: "Start a session when you're ready. Read its output first if you like; a short run like planning may finish before a session is worth it.",
+    act: "Start session",
+  },
   blocked: {
     kicker: "Agent blocked",
     title: "Your agent needs you",
@@ -34,9 +42,10 @@ function ago(since: string, now: number): string {
 }
 
 // The one thing allowed to interrupt practice. It asks; it never pauses anything.
-export function ReminderCard({ reminder, event, onAct, onSnooze }: ReminderCardProps) {
+export function ReminderCard({ reminder, event, onAct, onSnooze, onDismiss }: ReminderCardProps) {
   const copy = COPY[reminder.kind];
   const blocked = reminder.kind === "blocked";
+  const working = reminder.kind === "working";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 5000);
@@ -50,13 +59,13 @@ export function ReminderCard({ reminder, event, onAct, onSnooze }: ReminderCardP
       aria-label={copy.title}
       className={cn(
         "flex flex-col gap-5 rounded-lg border bg-surface-raised p-6",
-        blocked ? "border-blocked/60 shadow-[0_0_0_1px_var(--blocked)]" : "border-success/50",
+        blocked ? "border-blocked/60 shadow-[0_0_0_1px_var(--blocked)]" : working ? "border-info/50" : "border-success/50",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", blocked ? "bg-blocked" : "bg-success")} aria-hidden />
-          <span className={cn("text-label uppercase", blocked ? "text-blocked" : "text-success")}>{copy.kicker}</span>
+          <span className={cn("size-2 rounded-full", blocked ? "bg-blocked" : working ? "bg-info" : "bg-success")} aria-hidden />
+          <span className={cn("text-label uppercase", blocked ? "text-blocked" : working ? "text-info" : "text-success")}>{copy.kicker}</span>
           {where && <span className="text-code text-ink-muted">/ {where}</span>}
         </div>
         <span className="text-code text-ink-faint">{ago(reminder.since, now)}</span>
@@ -71,6 +80,11 @@ export function ReminderCard({ reminder, event, onAct, onSnooze }: ReminderCardP
         <Button onClick={onAct} className={cn("h-10 px-5", blocked && "bg-blocked text-on-blocked")}>
           {copy.act}
         </Button>
+        {onDismiss && (
+          <Button variant="ghost" className="h-10" onClick={onDismiss}>
+            Not this run
+          </Button>
+        )}
         <span className="flex items-center gap-1.5 text-body-sm text-ink-muted">
           <BellOff className="size-4" aria-hidden />
           Remind me in
@@ -82,10 +96,12 @@ export function ReminderCard({ reminder, event, onAct, onSnooze }: ReminderCardP
         ))}
       </div>
 
-      <div className="flex items-center gap-3 rounded-md border border-border bg-surface-sunken px-4 py-3 text-body-sm text-ink-muted">
+      {!working && (
+        <div className="flex items-center gap-3 rounded-md border border-border bg-surface-sunken px-4 py-3 text-body-sm text-ink-muted">
         <Info className="size-4 shrink-0 text-info" aria-hidden />
-        Practice carries on: nothing is paused and your answers keep counting.
-      </div>
+          Practice carries on: nothing is paused and your answers keep counting.
+        </div>
+      )}
     </section>
   );
 }
