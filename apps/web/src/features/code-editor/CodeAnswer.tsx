@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AttemptResult } from "../exercise-engine/useExercise";
+import type { AttemptResult } from "../exercise-engine/types";
 import { formatCall, LANGUAGE_LABEL, literal, type CodeLanguage, type CodeView } from "./languages";
 
 // CodeMirror is large, so it is only fetched when a programming problem is shown.

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { CALCULATOR_TIERS, setDifficultyBound, type CalculatorTier, type Settings, type SubjectId } from "../settings/settings";
+import { CALCULATOR_TIERS, SESSION_SIZES, setDifficultyBound, toggleSubject, type CalculatorTier, type Settings, type SubjectId } from "../settings/settings";
 
 const SUBJECTS: { id: SubjectId; label: string }[] = [
   { id: "math", label: "Math" },
@@ -11,27 +11,29 @@ const SUBJECTS: { id: SubjectId; label: string }[] = [
 const TIER_LABEL: Record<CalculatorTier, string> = { none: "None", basic: "Basic", scientific: "Scientific", stats: "Stats" };
 
 export function SubjectSettingsBar({ settings, onChange }: { settings: Settings; onChange: (patch: Partial<Settings>) => void }) {
-  const { subject, minDifficulty, maxDifficulty, calculator } = settings;
+  const { subjects, minDifficulty, maxDifficulty, calculator, sessionSize } = settings;
   const rangeText = minDifficulty === maxDifficulty ? `${minDifficulty}` : `${minDifficulty} to ${maxDifficulty}`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 rounded-lg bg-surface-raised px-6 py-4 shadow-sm">
-      <div role="radiogroup" aria-label="Subject" className="flex items-center gap-2">
-        {SUBJECTS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={subject === id}
-            onClick={() => onChange({ subject: id })}
-            className={cn(
-              "rounded-full px-4 py-2 text-label uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-              subject === id ? "bg-brand text-on-brand" : "bg-surface-sunken text-ink-muted hover:text-ink",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      <div role="group" aria-label="Subjects" className="flex flex-wrap items-center gap-2">
+        {SUBJECTS.map(({ id, label }) => {
+          const on = subjects.includes(id);
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange({ subjects: toggleSubject(subjects, id) })}
+              className={cn(
+                "rounded-full px-4 py-2 text-label uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+                on ? "bg-brand text-on-brand" : "bg-surface-sunken text-ink-muted hover:text-ink",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -58,6 +60,21 @@ export function SubjectSettingsBar({ settings, onChange }: { settings: Settings;
         </div>
 
         <div className="hidden h-7 w-px bg-border sm:block" aria-hidden />
+
+        <label className="flex items-center gap-2">
+          <span className="text-body-sm text-ink-muted">Questions</span>
+          <select
+            value={sessionSize}
+            onChange={(e) => onChange({ sessionSize: Number(e.target.value) })}
+            className="cursor-pointer appearance-none rounded-full bg-surface-sunken px-3 py-1 text-label uppercase text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            {SESSION_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="flex items-center gap-2">
           <span className="text-body-sm text-ink-muted">Calculator</span>

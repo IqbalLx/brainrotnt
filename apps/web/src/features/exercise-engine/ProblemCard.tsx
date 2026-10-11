@@ -2,19 +2,19 @@ import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
 import { CodeAnswer } from "../code-editor/CodeAnswer";
 import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
 import { AnswerInput } from "./AnswerInput";
-import type { AttemptResult, Phase, Problem } from "./useExercise";
+import type { AttemptResult, Phase, Problem } from "./types";
 
 const CalculatorPanel = lazy(() => import("../calculator/CalculatorPanel"));
 
 interface ProblemCardProps {
-  problem: Problem | null;
+  problem: Problem;
   phase: Phase;
   result: AttemptResult | null;
   message: string | null;
@@ -23,50 +23,14 @@ interface ProblemCardProps {
   onSubmit: (answer: string | number | CodeSubmission, toolsUsed: string[]) => void;
   onFlag: () => void;
   onNext: () => void;
+  onSkip: () => void;
+  /** What moving on is called after a result, e.g. "Next question" or "See your score". */
+  nextLabel: string;
 }
 
 export function ProblemCard(props: ProblemCardProps) {
-  const { problem, phase, message, onNext } = props;
-
-  if (phase === "error") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Can't reach the bridge</CardTitle>
-          <CardDescription>{message}</CardDescription>
-        </CardHeader>
-        <div>
-          <Button variant="outline" onClick={onNext}>
-            Retry
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  if (phase === "loading") {
-    return (
-      <Card aria-busy="true">
-        <CardDescription>Loading a problem…</CardDescription>
-      </Card>
-    );
-  }
-
-  if (phase === "empty") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No problems match these settings</CardTitle>
-          <CardDescription>
-            Widen the difficulty range, pick another subject, or run <code className="text-code">bun run db:seed</code>.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  if (!problem) return null;
-  return <ActiveProblem key={problem.id} {...props} problem={problem} />;
+  // Keyed by problem so every question starts from a clean slate.
+  return <ActiveProblem key={props.problem.id} {...props} />;
 }
 
 function DifficultyDots({ value }: { value: number }) {
@@ -91,7 +55,9 @@ function ActiveProblem({
   onSubmit,
   onFlag,
   onNext,
-}: ProblemCardProps & { problem: Problem }) {
+  onSkip,
+  nextLabel,
+}: ProblemCardProps) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
   const codeView = problem.type === "code" ? problem.code : null;
@@ -170,14 +136,14 @@ function ActiveProblem({
           <div className="flex items-center gap-3">
             {phase === "result" ? (
               <Button type="button" autoFocus onClick={onNext}>
-                Next problem
+                {nextLabel}
               </Button>
             ) : (
               <>
                 <Button type="submit" disabled={!canSubmit}>
                   {phase === "submitting" ? (problem.type === "code" ? "Running tests" : "Checking") : "Submit"}
                 </Button>
-                <Button type="button" variant="ghost" onClick={onNext} disabled={phase === "submitting"}>
+                <Button type="button" variant="ghost" onClick={onSkip} disabled={phase === "submitting"}>
                   Skip
                 </Button>
               </>

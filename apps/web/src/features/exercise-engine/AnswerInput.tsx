@@ -1,6 +1,6 @@
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AttemptResult, Problem } from "./useExercise";
+import type { AttemptResult, Problem } from "./types";
 
 interface AnswerInputProps {
   problem: Problem;

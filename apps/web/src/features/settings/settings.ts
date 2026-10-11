@@ -6,16 +6,34 @@ export const SUBJECT_IDS = ["math", "stats", "physics", "code"] as const;
 export type SubjectId = (typeof SUBJECT_IDS)[number];
 
 
+export const SESSION_SIZES = [3, 5, 10, 15, 20] as const;
+
 export interface Settings {
-  subject: SubjectId;
+  /** Every subject a session draws from; never empty. */
+  subjects: SubjectId[];
   minDifficulty: number;
   maxDifficulty: number;
   calculator: CalculatorTier;
+  sessionSize: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { subject: "math", minDifficulty: 1, maxDifficulty: 5, calculator: "scientific" };
+export const DEFAULT_SETTINGS: Settings = {
+  subjects: ["math", "stats", "physics", "code"],
+  minDifficulty: 1,
+  maxDifficulty: 5,
+  calculator: "scientific",
+  sessionSize: 5,
+};
 
-export const STORAGE_KEY = "brainrotnt.settings.v1";
+export const STORAGE_KEY = "brainrotnt.settings.v2";
+/** v1 stored one subject; it is read once so an upgrade keeps the person's choices. */
+export const LEGACY_STORAGE_KEY = "brainrotnt.settings.v1";
+
+// Toggling the last selected subject off would leave nothing to practise, so it stays on.
+export function toggleSubject(subjects: SubjectId[], subject: SubjectId): SubjectId[] {
+  if (!subjects.includes(subject)) return SUBJECT_IDS.filter((id) => id === subject || subjects.includes(id));
+  return subjects.length === 1 ? subjects : subjects.filter((id) => id !== subject);
+}
 
 // Outside the range extends it, an end dot shrinks it by one level, and an inner dot moves the
 // nearer bound (a tie moves the lower one). A single-level range stays put when clicked.
@@ -33,23 +51,43 @@ export function effectiveTier(problemTier: CalculatorTier, ceiling: CalculatorTi
   return CALCULATOR_TIERS.indexOf(problemTier) <= CALCULATOR_TIERS.indexOf(ceiling) ? problemTier : ceiling;
 }
 
-export function parseStoredSettings(raw: string | null): Settings {
-  if (!raw) return DEFAULT_SETTINGS;
-  try {
-    const value = JSON.parse(raw) as Record<string, unknown>;
-    const { subject, minDifficulty, maxDifficulty, calculator } = value;
-    const validLevel = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 5;
-    if (
-      SUBJECT_IDS.includes(subject as SubjectId) &&
-      validLevel(minDifficulty) &&
-      validLevel(maxDifficulty) &&
-      minDifficulty <= maxDifficulty &&
-      CALCULATOR_TIERS.includes(calculator as CalculatorTier)
-    ) {
-      return { subject: subject as SubjectId, minDifficulty, maxDifficulty, calculator: calculator as CalculatorTier };
-    }
-  } catch {
-    // fall through to the defaults
+export function parseStoredSettings(raw: string | null, legacy: string | null = null): Settings {
+  const value = readJson(raw) ?? upgradeLegacy(readJson(legacy));
+  if (!value) return DEFAULT_SETTINGS;
+  const { subjects, minDifficulty, maxDifficulty, calculator, sessionSize } = value;
+  const validLevel = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 5;
+  if (
+    Array.isArray(subjects) &&
+    subjects.length > 0 &&
+    subjects.every((s) => SUBJECT_IDS.includes(s as SubjectId)) &&
+    validLevel(minDifficulty) &&
+    validLevel(maxDifficulty) &&
+    minDifficulty <= maxDifficulty &&
+    CALCULATOR_TIERS.includes(calculator as CalculatorTier)
+  ) {
+    return {
+      subjects: SUBJECT_IDS.filter((id) => subjects.includes(id)),
+      minDifficulty,
+      maxDifficulty,
+      calculator: calculator as CalculatorTier,
+      sessionSize: SESSION_SIZES.includes(sessionSize as never) ? (sessionSize as number) : DEFAULT_SETTINGS.sessionSize,
+    };
   }
   return DEFAULT_SETTINGS;
+}
+
+function readJson(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw);
+    return typeof value === "object" && value !== null ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function upgradeLegacy(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!value || typeof value.subject !== "string") return null;
+  const { subject, ...rest } = value;
+  return { ...rest, subjects: [subject] };
 }
