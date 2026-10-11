@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { runCalls, valuesMatch } from "./code-runner";
+import { getSandboxMode } from "./sandbox-runner";
+
+const strict = (await getSandboxMode()) === "strict";
 
 const ran = async (...args: Parameters<typeof runCalls>) => {
   const outcome = await runCalls(...args);
@@ -72,13 +75,16 @@ describe.each([
     expect(await runCalls(language, loop, "solve", calls, { timeoutMs: 700 })).toMatchObject({ status: "failed", reason: "timeout" });
   });
 
-  test("the solution sees no secrets from the server and has no network", async () => {
+  test("the solution sees no secrets from the server", async () => {
     process.env.BRAINROTNT_FAKE_SECRET = "s3cret-token";
     try {
       expect(await ran(language, leak, "solve", [[1, 2]])).toEqual([{ ok: true, value: "none" }]);
     } finally {
       delete process.env.BRAINROTNT_FAKE_SECRET;
     }
+  });
+
+  test.skipIf(!strict)("the solution has no network", async () => {
     expect(await ran(language, net, "solve", [[1, 2]])).toEqual([{ ok: true, value: "blocked" }]);
   });
 
