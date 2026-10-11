@@ -136,7 +136,8 @@ export async function runProgram(program: Program, options: SandboxOptions = {})
     );
   }
 
-  // The server's own Bun runs JavaScript, so there is nothing extra to install.
+  // The server's own Bun runs JavaScript, so there is nothing extra to install. In the compiled brnt
+  // binary execPath is brnt itself, which BUN_BE_BUN (below) turns back into Bun.
   const interpreter = javascript ? process.execPath : (Bun.which("python3") as string);
   const flags = javascript ? '--no-install "$1"' : '-I -B "$1"';
   const dir = await mkdtemp(join(tmpdir(), "brainrotnt-sandbox-"));
@@ -157,7 +158,8 @@ export async function runProgram(program: Program, options: SandboxOptions = {})
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONHASHSEED: "0",
         // Bun wants a writable home for its caches; the empty working directory is the only one it gets.
-        ...(javascript ? { HOME: dir, TMPDIR: dir } : {}),
+        // BUN_BE_BUN makes a compiled brnt binary act as plain Bun instead of parsing brnt's own arguments.
+        ...(javascript ? { HOME: dir, TMPDIR: dir, BUN_BE_BUN: "1" } : {}),
       },
       stdin: "ignore",
       stdout: "pipe",
