@@ -39,3 +39,33 @@ export async function resetDb() {
   await db.delete(flags);
   await db.delete(problems);
 }
+
+let specCounter = 0;
+const unique = () => `${++specCounter}`.padStart(3, "0");
+
+export function numericSpec(overrides: Record<string, unknown> = {}) {
+  return {
+    subject: "math",
+    topic: "arithmetic",
+    difficulty: 1,
+    type: "numeric",
+    statement: `What is 6 times 7, in test case ${unique()}?`,
+    tools: { calculator: "basic", draw: false },
+    answer: { value: 42, tolerance: 0 },
+    reference: { code: "print(6 * 7)" },
+    ...overrides,
+  };
+}
+
+export function mcqSpec(overrides: Record<string, unknown> = {}) {
+  return {
+    subject: "physics",
+    topic: "vectors",
+    difficulty: 1,
+    type: "mcq",
+    statement: `Which of these quantities is a vector, in test case ${unique()}?`,
+    answer: { options: ["Speed", "Mass", "Velocity", "Energy"], correct: 2 },
+    reference: { code: "print(['Speed', 'Mass', 'Velocity', 'Energy'].index('Velocity'))" },
+    ...overrides,
+  };
+}

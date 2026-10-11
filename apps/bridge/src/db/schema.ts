@@ -11,7 +11,7 @@ export const problems = sqliteTable("problems", {
   tools: text("tools", { mode: "json" }).notNull(),
   answer: text("answer", { mode: "json" }).notNull(),
   verificationStatus: text("verification_status", {
-    enum: ["verified", "unverified", "flagged"],
+    enum: ["verified", "unverified", "flagged", "retired"],
   })
     .notNull()
     .default("unverified"),
