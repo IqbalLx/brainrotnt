@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
+import { useCalculatorState } from "../calculator/calculatorState";
 import { CodeAnswer } from "../code-editor/CodeAnswer";
 import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
@@ -83,6 +84,7 @@ function ActiveProblem({
   const starterOf = (lang: CodeLanguage) => codeView?.languages.find((l) => l.language === lang)?.starter ?? "";
   const draft = drafts[language] ?? "";
   const [usedCalculator, setUsedCalculator] = useState(false);
+  const calculatorState = useCalculatorState();
   const [usedDrawing, setUsedDrawing] = useState(false);
   const tier = effectiveTier(problem.tools.calculator, calculatorCeiling);
   const elapsed = useQuestionClock(phase !== "result");
@@ -102,16 +104,19 @@ function ActiveProblem({
   }
 
   const hintsPanel = <Hints hints={hints} hintCount={hintCount} canOpen={!locked} opening={openingHint} onOpen={onOpenHint} />;
-  const calculator =
+  // The tools column and the drawing sheet each show it; they share one state, so they are one calculator.
+  const renderCalculator = () =>
     tier === "none" ? null : (
       <Suspense fallback={<p className="text-body-sm text-ink-muted">Loading the calculator…</p>}>
         <CalculatorPanel
           tier={tier}
+          state={calculatorState}
           onUsed={() => setUsedCalculator(true)}
           onCopy={problem.type === "numeric" || problem.type === "symbolic" ? (value) => !locked && setText(value) : undefined}
         />
       </Suspense>
     );
+  const calculator = renderCalculator();
   // Code needs the full width for the editor; everything else gets a tools column beside it.
   const split = !codeView && (calculator !== null || hintCount > 0);
   const long = problem.statement.length > 220;
@@ -197,7 +202,9 @@ function ActiveProblem({
           </form>
 
           {!split && hintsPanel}
-          {problem.tools.draw && <DrawingBoardPanel onDraw={() => setUsedDrawing(true)} />}
+          {problem.tools.draw && (
+            <DrawingBoardPanel statement={problem.statement} calculator={renderCalculator()} onDraw={() => setUsedDrawing(true)} />
+          )}
         </div>
 
         {split && (

@@ -1,7 +1,8 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { calculate, tierRank, type CalcResult, type CalculatorTier } from "@brainrotnt/math-engine";
+import { calculate, tierRank, type CalculatorTier } from "@brainrotnt/math-engine";
+import type { CalculatorState } from "./calculatorState";
 import { BASIC_KEYS, FUNCTION_KEYS, type CalcKey } from "./keys";
 
 const TIER_LABEL: Record<CalculatorTier, string> = { none: "None", basic: "Basic", scientific: "Scientific", stats: "Stats" };
@@ -12,14 +13,15 @@ const keyClass =
 // A tool the person reached for. It only ever reflects the tier it is handed.
 interface CalculatorPanelProps {
   tier: Exclude<CalculatorTier, "none">;
+  /** Shared by every panel showing this problem's calculator (see calculatorState). */
+  state: CalculatorState;
   onUsed: () => void;
   /** Puts a result into the answer box, when the problem takes a typed answer. */
   onCopy?: (value: string) => void;
 }
 
-export default function CalculatorPanel({ tier, onUsed, onCopy }: CalculatorPanelProps) {
-  const [expression, setExpression] = useState("");
-  const [result, setResult] = useState<CalcResult | null>(null);
+export default function CalculatorPanel({ tier, state, onUsed, onCopy }: CalculatorPanelProps) {
+  const { expression, result, setExpression, setResult } = state;
   const input = useRef<HTMLInputElement>(null);
 
   function edit(next: string, caret: number) {
