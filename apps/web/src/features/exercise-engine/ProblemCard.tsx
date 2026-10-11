@@ -1,15 +1,17 @@
-import { lazy, Suspense, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
 import { CodeAnswer } from "../code-editor/CodeAnswer";
 import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
+import { SUBJECT_LABEL } from "../session/format";
+import { formatElapsed } from "../run-timer/timerState";
 import { AnswerInput } from "./AnswerInput";
 import { Hints } from "./Hints";
+import { ToolsPanel } from "./ToolsPanel";
 import type { AttemptResult, Phase, Problem } from "./types";
 
 const CalculatorPanel = lazy(() => import("../calculator/CalculatorPanel"));
@@ -31,6 +33,8 @@ interface ProblemCardProps {
   hintCount: number;
   openingHint: boolean;
   onOpenHint: () => void;
+  /** Session progress, shown at the right of the ribbon. */
+  progress?: ReactNode;
 }
 
 export function ProblemCard(props: ProblemCardProps) {
@@ -38,17 +42,17 @@ export function ProblemCard(props: ProblemCardProps) {
   return <ActiveProblem key={props.problem.id} {...props} />;
 }
 
-function DifficultyDots({ value }: { value: number }) {
-  return (
-    <span role="img" aria-label={`Difficulty ${value} of 5`} className="ml-3 flex gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} className={cn("size-[7px] rounded-full", n <= value ? "bg-ink-muted" : "bg-border")} />
-      ))}
-    </span>
-  );
+// Counts up while the question is on screen; stops once it is answered.
+function useQuestionClock(running: boolean) {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    if (!running) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [running]);
+  return now - startedAt;
 }
-
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function ActiveProblem({
   problem,
@@ -66,6 +70,7 @@ function ActiveProblem({
   hintCount,
   openingHint,
   onOpenHint,
+  progress,
 }: ProblemCardProps) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
@@ -80,6 +85,7 @@ function ActiveProblem({
   const [usedCalculator, setUsedCalculator] = useState(false);
   const [usedDrawing, setUsedDrawing] = useState(false);
   const tier = effectiveTier(problem.tools.calculator, calculatorCeiling);
+  const elapsed = useQuestionClock(phase !== "result");
 
   const locked = phase === "submitting" || phase === "result";
   const canSubmit =
@@ -95,89 +101,116 @@ function ActiveProblem({
     ]);
   }
 
+  const hintsPanel = <Hints hints={hints} hintCount={hintCount} canOpen={!locked} opening={openingHint} onOpen={onOpenHint} />;
+  const calculator =
+    tier === "none" ? null : (
+      <Suspense fallback={<p className="text-body-sm text-ink-muted">Loading the calculator…</p>}>
+        <CalculatorPanel
+          tier={tier}
+          onUsed={() => setUsedCalculator(true)}
+          onCopy={problem.type === "numeric" || problem.type === "symbolic" ? (value) => !locked && setText(value) : undefined}
+        />
+      </Suspense>
+    );
+  // Code needs the full width for the editor; everything else gets a tools column beside it.
+  const split = !codeView && (calculator !== null || hintCount > 0);
+  const long = problem.statement.length > 220;
+
   return (
-    <>
-      <Card>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Badge variant="brand">{problem.subject}</Badge>
-            <DifficultyDots value={problem.difficulty} />
-            {problem.unverified && (
-              <Badge variant="blocked" className="ml-3" title="Fewer than two independent sources confirm this fact. Flag it if it looks wrong.">
-                Unverified
-              </Badge>
-            )}
-          </div>
-          <Button variant={flagged ? "flagged" : "outline"} size="sm" disabled={flagged} onClick={onFlag}>
-            <Flag className="size-4" aria-hidden />
-            {flagged ? "Flagged" : "Flag"}
-          </Button>
-        </div>
-
-        <p className="text-body text-ink">{problem.statement}</p>
-
-        <Hints hints={hints} hintCount={hintCount} canOpen={!locked} opening={openingHint} onOpen={onOpenHint} />
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {codeView ? (
-            <CodeAnswer
-              view={codeView}
-              language={language}
-              code={draft}
-              onLanguage={setLanguage}
-              onCode={(code) => setDrafts((current) => ({ ...current, [language]: code }))}
-              onReset={() => setDrafts((current) => ({ ...current, [language]: starterOf(language) }))}
-              onSubmit={() => canSubmit && handleSubmit()}
-              result={result}
-              locked={locked}
-            />
-          ) : (
-            <AnswerInput
-              problem={problem}
-              text={text}
-              choice={choice}
-              onText={setText}
-              onChoice={setChoice}
-              result={result}
-              locked={locked}
-            />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex flex-wrap items-center gap-2 text-body-sm">
+          <span className="font-medium text-ink">{SUBJECT_LABEL[problem.subject] ?? problem.subject}</span>
+          <span className="text-ink-faint">/</span>
+          <span className="text-ink-muted">{problem.topic}</span>
+          <span className="text-ink-faint" aria-hidden>
+            ·
+          </span>
+          <Badge variant="info" aria-label={`Difficulty ${problem.difficulty} of 5`}>
+            Diff {problem.difficulty} / 5
+          </Badge>
+          {problem.unverified && (
+            <Badge variant="blocked" title="Fewer than two independent sources confirm this fact. Flag it if it looks wrong.">
+              Unverified
+            </Badge>
           )}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span role="timer" aria-label="Time on this question" className="text-code text-ink-muted">
+            {formatElapsed(elapsed)}
+          </span>
+          {progress}
+        </div>
+      </div>
 
-          {message && (
-            <p role="alert" className="text-body-sm text-danger">
-              {message}
+      <div className={cn("grid items-start gap-8", split && "lg:grid-cols-12")}>
+        <div className={cn("flex flex-col gap-6", split && "lg:col-span-7")}>
+          <div className="flex items-start justify-between gap-4">
+            <p className={cn("text-ink", long ? "text-heading-sm font-normal leading-relaxed" : "text-heading-lg font-normal leading-snug")}>
+              {problem.statement}
             </p>
-          )}
-
-          <div className="flex items-center gap-3">
-            {phase === "result" ? (
-              <Button key="next" type="button" autoFocus onClick={onNext}>
-                {nextLabel}
-              </Button>
-            ) : (
-              <>
-                <Button type="submit" disabled={!canSubmit}>
-                  {phase === "submitting" ? (problem.type === "code" ? "Running tests" : "Checking") : "Submit"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={onSkip} disabled={phase === "submitting"}>
-                  Skip
-                </Button>
-              </>
-            )}
+            <Button variant={flagged ? "flagged" : "ghost"} size="sm" disabled={flagged} onClick={onFlag} className="shrink-0">
+              <Flag className="size-4" aria-hidden />
+              {flagged ? "Flagged" : "Flag"}
+            </Button>
           </div>
-        </form>
 
-        <div className="flex gap-3 border-t border-border pt-4">
-          <Badge variant="muted">Calculator: {capitalize(tier)}</Badge>
-          <Badge variant="muted">Draw: {problem.tools.draw ? "on" : "off"}</Badge>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            {codeView ? (
+              <CodeAnswer
+                view={codeView}
+                language={language}
+                code={draft}
+                onLanguage={setLanguage}
+                onCode={(code) => setDrafts((current) => ({ ...current, [language]: code }))}
+                onReset={() => setDrafts((current) => ({ ...current, [language]: starterOf(language) }))}
+                onSubmit={() => canSubmit && handleSubmit()}
+                result={result}
+                locked={locked}
+              />
+            ) : (
+              <AnswerInput problem={problem} text={text} choice={choice} onText={setText} onChoice={setChoice} result={result} locked={locked} />
+            )}
+
+            {message && (
+              <p role="alert" className="text-body-sm text-danger">
+                {message}
+              </p>
+            )}
+
+            <div className="flex items-center gap-3">
+              {phase === "result" ? (
+                <Button key="next" type="button" autoFocus onClick={onNext} className="h-11 px-6">
+                  {nextLabel}
+                </Button>
+              ) : (
+                <>
+                  <Button type="submit" disabled={!canSubmit} className="h-11 px-6">
+                    {phase === "submitting" ? (problem.type === "code" ? "Running tests" : "Checking") : "Submit"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={onSkip} disabled={phase === "submitting"}>
+                    Skip
+                  </Button>
+                </>
+              )}
+            </div>
+          </form>
+
+          {!split && hintsPanel}
+          {problem.tools.draw && <DrawingBoardPanel onDraw={() => setUsedDrawing(true)} />}
         </div>
-      </Card>
-      {problem.tools.draw && <DrawingBoardPanel onDraw={() => setUsedDrawing(true)} />}
-      {tier !== "none" && (
-        <Suspense fallback={null}>
-          <CalculatorPanel tier={tier} onUsed={() => setUsedCalculator(true)} />
-        </Suspense>
-      )}
-    </>
+
+        {split && (
+          <div className="lg:sticky lg:top-20 lg:col-span-5">
+            <ToolsPanel
+              tabs={[
+                ...(calculator ? [{ id: "calculator", label: "Calculator", content: calculator }] : []),
+                ...(hintCount > 0 ? [{ id: "hints", label: `Hints ${hints.length}/${hintCount}`, content: hintsPanel }] : []),
+              ]}
+            />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

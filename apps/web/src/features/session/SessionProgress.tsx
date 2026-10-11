@@ -20,9 +20,9 @@ export function SessionProgress({ view, shownCredit, onEnd, disabled }: SessionP
   const position = view.position ?? view.items.length - 1;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-4">
-        <span className="text-heading-sm" aria-live="polite">
+    <div className="flex flex-wrap items-center gap-4">
+      <div className="flex items-center gap-3">
+        <span className="text-code text-ink" aria-live="polite">
           Question {position + 1} of {view.size}
         </span>
         <ol aria-label="Questions" className="flex gap-1.5">
@@ -31,7 +31,7 @@ export function SessionProgress({ view, shownCredit, onEnd, disabled }: SessionP
               key={item.position}
               aria-label={`Question ${item.position + 1}: ${item.outcome === null ? (item.position === view.position ? "current" : "to do") : item.outcome === "skipped" ? "skipped" : item.credit ? "correct" : "incorrect"}`}
               className={cn(
-                "size-2.5 rounded-full",
+                "size-2 rounded-full",
                 item.outcome === null && item.position === view.position && "bg-brand",
                 item.outcome === null && item.position !== view.position && "bg-border",
                 item.outcome === "skipped" && "bg-ink-faint",
@@ -40,7 +40,7 @@ export function SessionProgress({ view, shownCredit, onEnd, disabled }: SessionP
             />
           ))}
         </ol>
-        <span className="text-body-sm text-ink-muted">{formatPoints(points)} pts</span>
+        <span className="text-code text-ink-muted">{formatPoints(points)} pts</span>
       </div>
       <Button variant="ghost" size="sm" onClick={onEnd} disabled={disabled}>
         End session

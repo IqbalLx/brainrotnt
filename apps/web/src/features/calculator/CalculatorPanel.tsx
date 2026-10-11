@@ -7,11 +7,17 @@ import { BASIC_KEYS, FUNCTION_KEYS, type CalcKey } from "./keys";
 const TIER_LABEL: Record<CalculatorTier, string> = { none: "None", basic: "Basic", scientific: "Scientific", stats: "Stats" };
 
 const keyClass =
-  "h-9 rounded-sm bg-surface-raised text-code text-ink transition-colors hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-surface-raised";
+  "h-9 rounded-md bg-surface-high/60 text-code text-ink transition-colors hover:bg-surface-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-surface-high/60";
 
-// A tool the person reached for: it floats above the page on the sunken surface and only ever
-// reflects the tier it is handed.
-export default function CalculatorPanel({ tier, onUsed }: { tier: Exclude<CalculatorTier, "none">; onUsed: () => void }) {
+// A tool the person reached for. It only ever reflects the tier it is handed.
+interface CalculatorPanelProps {
+  tier: Exclude<CalculatorTier, "none">;
+  onUsed: () => void;
+  /** Puts a result into the answer box, when the problem takes a typed answer. */
+  onCopy?: (value: string) => void;
+}
+
+export default function CalculatorPanel({ tier, onUsed, onCopy }: CalculatorPanelProps) {
   const [expression, setExpression] = useState("");
   const [result, setResult] = useState<CalcResult | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -58,11 +64,9 @@ export default function CalculatorPanel({ tier, onUsed }: { tier: Exclude<Calcul
   );
 
   return (
-    <section aria-label="Calculator" className="flex flex-col gap-4 rounded-lg bg-surface-sunken p-4 shadow-md">
+    <section aria-label="Calculator" className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Badge variant="ink" className="bg-surface-raised">
-          {TIER_LABEL[tier]}
-        </Badge>
+        <Badge variant="ink">{TIER_LABEL[tier]}</Badge>
         {tierRank(tier) >= tierRank("scientific") && <span className="text-body-sm text-ink-muted">Angles in radians</span>}
       </div>
 
@@ -85,11 +89,16 @@ export default function CalculatorPanel({ tier, onUsed }: { tier: Exclude<Calcul
               evaluate();
             }
           }}
-          className="rounded-md border border-border bg-surface-raised px-3 py-2 text-code text-ink outline-none placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-md border border-border bg-surface-sunken px-3 py-2 text-code text-ink caret-info outline-none placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         />
-        <div role="status" aria-live="polite" className="min-h-5 px-1">
-          {result?.ok && <span className="text-code text-ink">= {result.text}</span>}
+        <div role="status" aria-live="polite" className="flex min-h-7 items-center justify-between gap-3 px-1">
+          {result?.ok && <span className="text-code-lg text-success">= {result.text}</span>}
           {result && !result.ok && <span className="text-body-sm text-ink-muted">{result.error}</span>}
+          {result?.ok && onCopy && (
+            <button type="button" onClick={() => onCopy(result.text)} className="text-body-sm text-info hover:underline focus-visible:outline-2 focus-visible:outline-focus-ring">
+              Copy to answer
+            </button>
+          )}
         </div>
       </div>
 

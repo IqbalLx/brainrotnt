@@ -75,9 +75,7 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
   const last = view.items.every((item) => item.position === view.position || item.outcome !== null);
 
   return (
-    <div className="flex flex-col gap-4">
-      <SessionProgress view={view} shownCredit={phase === "result" ? (result?.credit ?? null) : null} onEnd={session.end} disabled={phase === "submitting"} />
-      <ProblemCard
+    <ProblemCard
         problem={view.current}
         phase={phase}
         result={result}
@@ -93,7 +91,9 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
         hintCount={view.current.hintCount}
         openingHint={session.revealing}
         onOpenHint={session.revealHint}
+        progress={
+          <SessionProgress view={view} shownCredit={phase === "result" ? (result?.credit ?? null) : null} onEnd={session.end} disabled={phase === "submitting"} />
+        }
       />
-    </div>
   );
 }

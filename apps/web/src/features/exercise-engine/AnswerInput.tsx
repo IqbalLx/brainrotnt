@@ -34,8 +34,8 @@ export function AnswerInput({ problem, text, choice, onText, onChoice, result, l
                 aria-checked={choice === index}
                 onClick={() => !locked && onChoice(index)}
                 className={cn(
-                  "flex items-start gap-2 rounded-md border border-border bg-surface-raised px-4 py-3 text-left text-body-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-                  !locked && "hover:border-ink-muted",
+                  "flex items-start gap-2 rounded-lg border border-border bg-surface-sunken px-4 py-3 text-left text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+                  !locked && "hover:border-border-strong hover:bg-surface-high",
                   choice === index && !result && "border-brand bg-brand/15",
                   isCorrect && TINT.correct,
                   isWrongPick && TINT.incorrect,
@@ -53,7 +53,7 @@ export function AnswerInput({ problem, text, choice, onText, onChoice, result, l
       ) : (
         <div
           className={cn(
-            "flex items-center gap-2 rounded-md border border-border bg-surface-sunken px-3 py-2 text-code text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring",
+            "flex h-12 items-center gap-2 rounded-lg border border-border bg-surface-sunken px-4 text-code-lg text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring",
             result?.correct && TINT.correct,
             result && !result.correct && TINT.incorrect,
           )}
@@ -69,9 +69,9 @@ export function AnswerInput({ problem, text, choice, onText, onChoice, result, l
             value={text}
             disabled={locked}
             onChange={(e) => onText(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-code text-ink outline-none placeholder:text-ink-faint"
+            className="min-w-0 flex-1 bg-transparent text-code-lg text-ink caret-info outline-none placeholder:text-ink-faint"
           />
-          {problem.unit && <span className="text-ink-muted">{problem.unit}</span>}
+          {problem.unit && <span className="rounded-md bg-surface-high px-2 py-0.5 text-code text-ink-muted">{problem.unit}</span>}
           {result?.correct && <Check className="size-4 text-success" aria-hidden />}
           {result && !result.correct && <X className="size-4 text-danger" aria-hidden />}
         </div>
