@@ -3,6 +3,7 @@ import { Bot, Check, ChevronDown, Copy, Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, SectionLabel } from "@/components/ui/card";
+import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import { SubjectSettingsBar } from "../exercise-engine/SubjectSettingsBar";
 import { SUBJECT_LABEL } from "../session/format";
@@ -80,8 +81,7 @@ function CopyButton({ text, label = "Copy prompt", variant = "default" }: { text
       variant={variant}
       size={variant === "outline" ? "sm" : "default"}
       onClick={() =>
-        navigator.clipboard
-          .writeText(text)
+        copyText(text)
           .then(() => setState("copied"))
           .catch(() => setState("failed"))
       }
