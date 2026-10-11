@@ -3,9 +3,16 @@ import { getSandboxMode, resetSandboxProbe, runPython } from "./sandbox-runner";
 
 const run = (code: string, options = {}) => runPython(code, { timeoutMs: 3000, ...options });
 
+// CI runners may not allow user namespaces; there the suite runs with BRAINROTNT_ALLOW_UNSANDBOXED=1
+// and only the tests that prove network isolation itself are skipped.
+const strict = (await getSandboxMode()) === "strict";
+
 describe("sandbox runner", () => {
-  test("runs python and returns stdout", async () => {
+  test.skipIf(!strict)("isolation is strict on this machine", async () => {
     expect(await getSandboxMode()).toBe("strict");
+  });
+
+  test("runs python and returns stdout", async () => {
     const result = await run("print(6 * 7)");
     expect(result).toMatchObject({ ok: true, stdout: "42\n" });
   });
@@ -39,7 +46,7 @@ describe("sandbox runner", () => {
     expect(result.ok).toBe(false);
   });
 
-  test("there is no network", async () => {
+  test.skipIf(!strict)("there is no network", async () => {
     const result = await run(`
 import socket
 try:
@@ -76,14 +83,18 @@ except OSError as e:
 });
 
 describe("when isolation is unavailable", () => {
+  const allowed = process.env.BRAINROTNT_ALLOW_UNSANDBOXED;
   afterEach(() => {
     delete process.env.BRAINROTNT_UNSHARE_BIN;
-    delete process.env.BRAINROTNT_ALLOW_UNSANDBOXED;
+    // Restored rather than deleted, so a run that opted in (CI) keeps its opt-in for later files.
+    if (allowed === undefined) delete process.env.BRAINROTNT_ALLOW_UNSANDBOXED;
+    else process.env.BRAINROTNT_ALLOW_UNSANDBOXED = allowed;
     resetSandboxProbe();
   });
 
   test("it fails closed and never runs the code", async () => {
     process.env.BRAINROTNT_UNSHARE_BIN = "/nonexistent/unshare";
+    delete process.env.BRAINROTNT_ALLOW_UNSANDBOXED;
     resetSandboxProbe();
     expect(await getSandboxMode()).toBe("unavailable");
     const result = await run("print('should not run')");
@@ -91,7 +102,7 @@ describe("when isolation is unavailable", () => {
     expect(!result.ok && result.message).toContain("BRAINROTNT_ALLOW_UNSANDBOXED");
   });
 
-  test("without the namespace the same connection fails differently, so the strict test is meaningful", async () => {
+  test.skipIf(!strict)("without the namespace the same connection fails differently, so the strict test is meaningful", async () => {
     process.env.BRAINROTNT_UNSHARE_BIN = "/nonexistent/unshare";
     process.env.BRAINROTNT_ALLOW_UNSANDBOXED = "1";
     resetSandboxProbe();

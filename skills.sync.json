@@ -1,0 +1,7 @@
+{
+  "source": "skills",
+  "targets": [
+    { "path": ".claude/skills", "checked": true },
+    { "path": "~/.claude/skills", "checked": false }
+  ]
+}

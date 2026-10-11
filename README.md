@@ -200,6 +200,20 @@ The UI follows the brainrotnt design system. Its tokens live in `apps/web/src/in
 
 Agent state names are shown exactly as Luvus reports them (Idle, Working, Blocked, Done). Blocked is the only state that interrupts: it pins a banner to the top of the window.
 
+## The authoring skill
+
+`skills/brainrotnt-problems/` is a skill that teaches Claude or Claude Code how to populate the bank: call `get_schema` first, target gaps from `get_coverage`, write verified problems, hints and explanations, cite trivia sources, repair flagged problems and backfill missing extras. The repo is the source of truth; harness folders hold copies:
+
+```bash
+scripts/sync-skills.sh              # copy into every target in skills.sync.json (.claude/skills and ~/.claude/skills)
+scripts/sync-skills.sh --repo-only  # only the copy committed in this repo
+bun run skills:check                # fail if the committed copy has drifted
+bun run skills:schema               # regenerate references/schema.md from the schema code
+bun run skills:schema:check         # fail if that snapshot is stale
+```
+
+A change to a feature the skill covers updates the skill in the same commit and bumps its `version`. Add another harness by adding a line to `skills.sync.json`. CI (`.github/workflows/ci.yml`) runs both checks, the typechecks, every test suite and the web build on each pull request.
+
 ## Checks
 
 ```sh

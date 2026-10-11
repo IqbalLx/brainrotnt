@@ -12,6 +12,10 @@
     "db:migrate": "bun --filter bridge db:migrate",
     "db:seed": "bun --filter bridge db:seed",
     "test": "bun --filter bridge test && bun --filter web test && bun --filter @brainrotnt/math-engine test",
-    "import": "bun run apps/bridge/src/features/import-problems/cli.ts"
+    "import": "bun run apps/bridge/src/features/import-problems/cli.ts",
+    "skills:sync": "sh scripts/sync-skills.sh",
+    "skills:check": "sh scripts/sync-skills.sh --check",
+    "skills:schema": "bun run scripts/skill-schema.ts",
+    "skills:schema:check": "bun run scripts/skill-schema.ts --check"
   }
 }

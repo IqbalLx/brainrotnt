@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Skills are in sync
+        run: bun run skills:check
+
+      - name: Schema snapshot is current
+        run: bun run skills:schema:check
+
+      - name: Typecheck
+        run: |
+          (cd apps/bridge && bunx tsc --noEmit -p .)
+          (cd apps/web && bunx tsc -b)
+
+      # The sandbox isolates untrusted code with an unprivileged network namespace. Ubuntu 24.04 restricts
+      # those through AppArmor; allow them so the isolation tests run for real. If that still fails, run
+      # without isolation (only our own test code runs here) and the isolation tests skip themselves.
+      - name: Sandbox
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          if unshare -rn -- true; then
+            echo "network namespaces available"
+          else
+            echo "BRAINROTNT_ALLOW_UNSANDBOXED=1" >> "$GITHUB_ENV"
+            echo "::warning::network namespaces unavailable; sandbox isolation tests are skipped"
+          fi
+
+      - name: Tests
+        run: bun run test
+
+      - name: Build
+        run: (cd apps/web && bunx vite build)
