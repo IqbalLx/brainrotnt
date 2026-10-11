@@ -1,8 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { CalculatorTier } from "../settings/settings";
-import { calculate, tierRank, type CalcResult } from "./engine";
+import { calculate, tierRank, type CalcResult, type CalculatorTier } from "@brainrotnt/math-engine";
 import { BASIC_KEYS, FUNCTION_KEYS, type CalcKey } from "./keys";
 
 const TIER_LABEL: Record<CalculatorTier, string> = { none: "None", basic: "Basic", scientific: "Scientific", stats: "Stats" };
