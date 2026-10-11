@@ -38,6 +38,15 @@ Inside a Luvus pane, `$LUVUS_SOCKET_PATH` is already set and is used automatical
 
 The bridge connects to the socket with your full local user authority and only reads state. Luvus named pipes (Windows) are not supported yet, and this path has been tested against a fake server written from the UHP 1.0 spec, not against a live Luvus.
 
+### When the agent state does not update
+
+The state travels three hops: Luvus → the bridge's UHP client → the SSE stream → the browser. Check them in order and stop at the first one that is wrong.
+
+1. **Is Luvus sending?** `bun run debug:uhp` subscribes to the socket itself and prints every raw frame with a timestamp (`--list` prints one `agent.list` reply instead, `--for 60` stops after a minute). Change the agent's state (send it a prompt, let it finish) and look for `pane.agent_status_changed`. Expect a lot of `terminal.output_ready` too. If no status event appears, the problem is in Luvus, not here.
+2. **Is the bridge receiving and applying it?** `curl -s localhost:8787/api/debug/agent-state | jq` shows `connection` (should be `subscribed`), `eventCounts` per event name, and the recent frames, each with an `outcome` such as `applied: pane 18 is working` or `ignored: data has no string pane and status`. `panes` is the bridge's table and `current` is what it published. Only one state is shown, the most urgent across panes (blocked > working > done > idle), so an idle pane can stay hidden behind a working one. Run the bridge with `UHP_DEBUG=1` to see the same thing live in its console.
+3. **Is the stream delivering it?** `bun run debug:sse` reads the stream as the browser does, with timestamps, how long ago each state was published, and `GAP` when an id is skipped. Add `--url http://localhost:5173` to go through the Vite proxy. To test the stream and the UI without Luvus, publish a state yourself: `curl -s -X POST localhost:8787/api/debug/agent-state -H 'content-type: application/json' -d '{"status":"blocked"}'`.
+4. **Is the browser handling it?** In the browser console run `localStorage.setItem("debug", "agent-state")` and reload: every open, error, ping and event is logged with its id and delay. The Network tab's EventStream view for `/api/agent-state/stream` shows the raw events.
+
 ## Configuration
 
 | Variable | Default | Used by | Purpose |
@@ -46,6 +55,7 @@ The bridge connects to the socket with your full local user authority and only r
 | `DB_PATH` | `./bridge.sqlite` | bridge | SQLite file, relative to `apps/bridge` |
 | `WEB_ORIGIN` | `http://localhost:5173` | bridge | Allowed CORS origin |
 | `UHP_SOCKET_PATH` | unset | bridge | Luvus socket; unset means the mock agent |
+| `UHP_DEBUG` | unset | bridge | `1` prints every UHP frame, published state and SSE client to the bridge console |
 | `BRIDGE_URL` | `http://127.0.0.1:8787` | web | Where the Vite dev server proxies `/api` |
 
 ## Project layout
@@ -96,7 +106,9 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `POST /api/sessions/:id/end` | end the session early; unanswered questions earn nothing |
 | `GET /api/sessions/:id/score` | the score screen, once the session has ended |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
-| `GET /api/agent-state/stream` | server-sent events with the current agent state |
+| `GET /api/agent-state/stream` | server-sent events with the current agent state; each `agent-state` event has an increasing `id`, and a `ping` comes every 5 s |
+| `GET /api/debug/agent-state?frames=50` | what the UHP client has seen: connection, frame counts per event, recent frames with what was done with each, the pane table, the published state and SSE client counts |
+| `POST /api/debug/agent-state` | publish `{status, pane?, agent?, ...}` as if Luvus sent it, to test the stream and the UI without Luvus |
 
 ## Pages
 

@@ -5,6 +5,7 @@ import { mcpRoute } from "./mcp/route";
 import { getSandboxMode } from "./infra/sandbox-runner";
 import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
+import { createDebugAgentStateRoute } from "./features/debug-agent-state/route";
 import { flagProblemRoute } from "./features/flag-problem/route";
 import { getNextProblemRoute } from "./features/get-next-problem/route";
 import { submitAttemptRoute } from "./features/submit-attempt/route";
@@ -35,7 +36,9 @@ if (sandbox !== "strict") {
 const uhpClient = createUhpClient();
 await uhpClient.start();
 
-app.route("/api/agent-state/stream", createAgentStateStreamRoute(uhpClient));
+const agentStateStream = createAgentStateStreamRoute(uhpClient);
+app.route("/api/agent-state/stream", agentStateStream.route);
+app.route("/api/debug/agent-state", createDebugAgentStateRoute(uhpClient, agentStateStream.stats));
 app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
