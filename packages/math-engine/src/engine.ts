@@ -12,7 +12,7 @@ import { type CalculatorTier } from "./tiers";
 const MAX_EXPRESSION_LENGTH = 200;
 
 const math = create(all);
-const parse = math.parse;
+export const parse = math.parse;
 const format = math.format;
 const originalFactorial = math.factorial;
 const originalCombinations = math.combinations;
@@ -63,7 +63,7 @@ math.import(
 export const restrictedMath = math;
 
 
-interface TierRules {
+export interface TierRules {
   operators: string[];
   functions: string[];
   constants: string[];
@@ -88,6 +88,14 @@ const STATS: TierRules = {
   constants: SCIENTIFIC.constants,
 };
 
+// What a symbolic answer may contain: arithmetic, powers, the usual functions and constants, and the
+// problem's own variables. No factorial or statistics.
+export const SYMBOLIC_RULES: TierRules = {
+  operators: BASIC.operators,
+  functions: [...SCIENTIFIC.functions, "abs"],
+  constants: SCIENTIFIC.constants,
+};
+
 const RULES: Record<Exclude<CalculatorTier, "none">, TierRules> = { basic: BASIC, scientific: SCIENTIFIC, stats: STATS };
 
 export function minimumTierFor(kind: "function" | "constant" | "operator", name: string): CalculatorTier {
@@ -108,7 +116,16 @@ interface NodeLike {
   value?: unknown;
 }
 
-function checkSyntax(node: MathNode, rules: TierRules): string | null {
+interface SyntaxOptions {
+  /** Names the expression may use besides the rules' constants, e.g. a problem's variables. */
+  variables?: readonly string[];
+  /** Wording for refusals: a calculator tier, or a student's answer. */
+  context?: "tier" | "answer";
+}
+
+export function checkSyntax(node: MathNode, rules: TierRules, options: SyntaxOptions = {}): string | null {
+  const variables = options.variables ?? [];
+  const where = options.context === "answer" ? "" : " at this tier";
   let problem: string | null = null;
 
   node.traverse((visited, path, visitedParent) => {
@@ -122,19 +139,23 @@ function checkSyntax(node: MathNode, rules: TierRules): string | null {
       case "ParenthesisNode":
         return;
       case "OperatorNode":
-        if (typeof n.fn !== "string" || !rules.operators.includes(n.fn)) problem = "That operator is not available at this tier";
+        if (typeof n.fn !== "string" || !rules.operators.includes(n.fn)) problem = `That operator is not available${where}`;
         return;
       case "FunctionNode": {
         const fn = n.fn as NodeLike;
         if (fn?.type !== "SymbolNode" || !fn.name || !rules.functions.includes(fn.name)) {
-          problem = `${fn?.name ?? "That function"} is not available at this tier`;
+          problem = `${fn?.name ?? "That function"} is not available${where}`;
         }
         return;
       }
       case "SymbolNode":
         // A function's own name was already checked at its FunctionNode.
         if (parent?.type === "FunctionNode" && path === "fn") return;
-        if (!n.name || !rules.constants.includes(n.name)) problem = `${n.name ?? "That name"} is not available at this tier`;
+        if (n.name && (rules.constants.includes(n.name) || variables.includes(n.name))) return;
+        problem =
+          options.context === "answer" && variables.length > 0
+            ? `${n.name ?? "That name"} is not a variable here; use ${variables.join(", ")}`
+            : `${n.name ?? "That name"} is not available${where}`;
         return;
       default:
         problem = "That syntax is not available";

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { problems } from "../../db/schema";
-import { mcqSpec, numericSpec, resetDb } from "../../test-support";
+import { mcqSpec, numericSpec, resetDb, symbolicSpec } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitProblems } from "./command";
 
@@ -99,7 +99,58 @@ describe("submitProblems", () => {
   });
 
   test("unsupported types are rejected", async () => {
-    const result = await submitProblems([numericSpec({ type: "symbolic", answer: { expression: "x" } })]);
+    const result = await submitProblems([numericSpec({ type: "code", answer: {} })]);
     expect(result.inserted).toBe(0);
+  });
+});
+
+describe("symbolic problems", () => {
+  test("a key that matches the independent reference values is verified, inserted and served", async () => {
+    const result = await submitProblems([symbolicSpec()]);
+    expect(result).toMatchObject({ inserted: 1, rejected: 0 });
+    const [row] = await db.select().from(problems);
+    expect(row).toMatchObject({ type: "symbolic", verificationStatus: "verified" });
+    expect(row.answer).toMatchObject({ expression: "3*x^2 + 2", variables: ["x"], domain: [-5, 5] });
+    expect(((await (await getNextProblemRoute.request("/?subject=math")).json()) as Record<string, any>).variables).toEqual(["x"]);
+  });
+
+  test("a wrong key is rejected and the message says where it disagrees", async () => {
+    const result = await submitProblems([symbolicSpec({ answer: { expression: "3*x^2 + 3", variables: ["x"] } })]);
+    expect(result.inserted).toBe(0);
+    expect((result.results[0] as any).errors[0]).toContain("reference solution disagrees with the key");
+    expect((result.results[0] as any).errors[0]).toContain("computed");
+  });
+
+  test("a reference solution that cheats by printing the key's own values still has to agree", async () => {
+    const result = await submitProblems([symbolicSpec({ reference: { code: 'import json\nprint(json.dumps({"points": [{"vars": {"x": v}, "value": 0} for v in range(6)]}))' } })]);
+    expect(result.inserted).toBe(0);
+  });
+
+  test("malformed reference output is explained", async () => {
+    const fewPoints = await submitProblems([symbolicSpec({ reference: { code: 'import json\nprint(json.dumps({"points": [{"vars": {"x": 1}, "value": 5}]}))' } })]);
+    expect((fewPoints.results[0] as any).errors[0]).toContain("at least 6 points");
+    const wrongVars = await submitProblems([symbolicSpec({ reference: { code: 'import json\nprint(json.dumps({"points": [{"vars": {"y": v}, "value": v} for v in range(6)]}))' } })]);
+    expect((wrongVars.results[0] as any).errors[0]).toContain("exactly the variables x");
+    const notObject = await submitProblems([symbolicSpec({ reference: { code: "print(5)" } })]);
+    expect((notObject.results[0] as any).errors[0]).toContain("must print");
+  });
+
+  test("a key that is not usable is rejected", async () => {
+    const undefinedKey = await submitProblems([symbolicSpec({ answer: { expression: "sqrt(x)", variables: ["x"], domain: [-5, -1] } })]);
+    expect((undefinedKey.results[0] as any).errors.join(" ")).toMatch(/undefined|disagrees/);
+    const forbidden = await submitProblems([symbolicSpec({ answer: { expression: "5!", variables: ["x"] } })]);
+    expect((forbidden.results[0] as any).errors.join(" ")).toContain("not usable");
+  });
+
+  test("the schema refuses bad variables and domains", async () => {
+    for (const answer of [
+      { expression: "x", variables: [] },
+      { expression: "x", variables: ["e"] },
+      { expression: "x", variables: ["x", "x"] },
+      { expression: "x", variables: ["xy"] },
+      { expression: "x", variables: ["x"], domain: [3, -3] },
+    ]) {
+      expect((await submitProblems([symbolicSpec({ answer })])).inserted).toBe(0);
+    }
   });
 });

@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice and numeric problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Symbolic and code problems are not built yet.
+> Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Code problems are not built yet.
 
 ## Prerequisites
 
@@ -70,8 +70,9 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 
 - **Multiple choice:** the chosen option must be the correct one.
 - **Numeric:** the value must be within the problem's relative tolerance (absolute when the answer is 0). You can type `12.4`, `1.2e3` or a fraction like `5/36`. If the problem has a unit, you can omit it, but a wrong unit counts as incorrect.
-- **Symbolic and code** problems are not gradable yet, so they are never served.
-- Input that cannot be parsed (for example `banana`) is rejected without being recorded as an attempt.
+- **Symbolic:** type an expression such as `2x + 1`. Any equivalent form is accepted (`1 + 2x`, `(4x + 2)/2`), and only the variables the problem names are allowed. The bridge checks equivalence by evaluating your expression and the key at 40 deterministic sample points; it is a strong randomized test, not a proof. A key that cannot be evaluated at enough points of its domain is reported as broken rather than counted against you. Expressions run through the same restricted maths engine as the calculator (no assignments, no function definitions, no `evaluate`).
+- **Code** problems are not gradable yet, so they are never served.
+- Input that cannot be parsed (for example `banana`, or `y^2` when the problem uses `x`) is rejected without being recorded as an attempt.
 
 ## API
 
@@ -106,7 +107,7 @@ Then ask for what you want, for example "use brainrotnt to add 5 stats problems 
 | `list_flagged` | problems you flagged in the UI, with their key and your reasons |
 | `update_problem` | replace a problem after repair |
 
-The server only accepts what it can verify. Every problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
+The server only accepts what it can verify. Every problem carries a Python **reference solution** that computes the answer from scratch and prints one JSON value (a number, or the index of the correct option). For a symbolic problem it prints at least 6 independently computed points, `{"points":[{"vars":{"x":1.5},"value":6.75},...]}`, which the stated expression must reproduce (a derivative, for example, is computed by finite differences rather than by re-typing the answer). The server runs it in the sandbox below and rejects the problem if it disagrees with the stated answer, so keys are computed rather than recalled. Duplicates (same statement and topic) are rejected, and statements must be original: store a source pointer such as a chapter, never copied text.
 
 For quantitative topics, Claude Code can submit a **template** instead of many hand-written problems: one statement with `{placeholders}` and a seeded Python generator.
 

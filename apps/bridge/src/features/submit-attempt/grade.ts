@@ -1,4 +1,5 @@
-import { mcqAnswer, numericAnswer } from "../../db/answer";
+import { checkEquivalent } from "@brainrotnt/math-engine";
+import { mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
 
 export type GradeResult =
   | { status: "graded"; correct: boolean; expected: string }
@@ -61,12 +62,27 @@ function gradeNumeric(stored: unknown, given: unknown): GradeResult {
   return { status: "graded", correct: Math.abs(parsed.value - answer.value) <= allowed, expected };
 }
 
+function gradeSymbolic(stored: unknown, given: unknown): GradeResult {
+  const answer = symbolicAnswer.parse(stored);
+  if (typeof given !== "string") return { status: "invalid", message: "Enter an expression, like 2x + 1." };
+
+  const result = checkEquivalent(answer.expression, given, answer);
+  if (!result.ok) {
+    return result.reason === "given"
+      ? { status: "invalid", message: result.error }
+      : { status: "invalid", message: "This problem's answer key cannot be checked. Flag it so it can be repaired." };
+  }
+  return { status: "graded", correct: result.equivalent, expected: answer.expression };
+}
+
 export function grade(type: string, stored: unknown, given: unknown): GradeResult {
   switch (type) {
     case "mcq":
       return gradeMcq(stored, given);
     case "numeric":
       return gradeNumeric(stored, given);
+    case "symbolic":
+      return gradeSymbolic(stored, given);
     default:
       return { status: "unsupported" };
   }

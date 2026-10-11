@@ -1,6 +1,6 @@
 import { and, between, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/client";
-import { GRADABLE_TYPES, mcqAnswer, numericAnswer } from "../../db/answer";
+import { GRADABLE_TYPES, mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
 import { problems } from "../../db/schema";
 import type { GetNextProblemQuery } from "./schema";
 
@@ -14,6 +14,7 @@ export interface ProblemView {
   tools: unknown;
   choices: string[] | null;
   unit: string | null;
+  variables: string[] | null;
 }
 
 export async function getNextProblem(filters: GetNextProblemQuery): Promise<ProblemView | null> {
@@ -50,5 +51,6 @@ export async function getNextProblem(filters: GetNextProblemQuery): Promise<Prob
     ...rest,
     choices: row.type === "mcq" ? mcqAnswer.parse(answer).options : null,
     unit: row.type === "numeric" ? (numericAnswer.parse(answer).unit ?? null) : null,
+    variables: row.type === "symbolic" ? symbolicAnswer.parse(answer).variables : null,
   };
 }

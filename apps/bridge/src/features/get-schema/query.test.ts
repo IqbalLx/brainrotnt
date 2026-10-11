@@ -9,6 +9,8 @@ describe("getSchema", () => {
     expect(text).toContain("prints ONE JSON value");
     expect(text).toContain("mcq");
     expect(text).toContain("numeric");
+    expect(text).toContain("symbolic");
+    expect(text).toContain("{\\\"points\\\"");
     expect(Object.keys(schema.templateSpec as object)).toContain("anyOf");
     expect(JSON.stringify(schema.templateSpec)).toContain("random.Random(seed)");
     expect(schema.supported.subjects).toEqual(["math", "stats", "physics"]);

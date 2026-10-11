@@ -6,10 +6,11 @@ export interface Problem {
   subject: string;
   topic: string;
   difficulty: number;
-  type: "mcq" | "numeric";
+  type: "mcq" | "numeric" | "symbolic";
   statement: string;
   choices: string[] | null;
   unit: string | null;
+  variables: string[] | null;
   tools: { calculator: "none" | "basic" | "scientific" | "stats"; draw: boolean };
 }
 
