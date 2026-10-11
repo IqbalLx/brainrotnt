@@ -1,12 +1,12 @@
 ---
 name: brainrotnt-problems
 description: Populate and maintain the brainrotnt problem bank through its MCP tools - write verified STEM problems (math, stats, physics, code), trivia with sources, templates, hints and explanations; repair flagged problems; backfill missing hints and explanations. Use when asked to add, generate, fix or backfill brainrotnt problems.
-version: 1.1.0
+version: 1.3.0
 ---
 
 # brainrotnt problems
 
-Version 1.2.0. brainrotnt is a local app for practising STEM problems and trivia while a coding agent works. The bank only accepts what the bridge can verify, so every item you write is checked before it is stored.
+Version 1.3.0. brainrotnt is a local app for practising STEM problems and trivia while a coding agent works. The bank only accepts what the bridge can verify, so every item you write is checked before it is stored.
 
 ## Before you write anything
 
@@ -25,6 +25,10 @@ If the brainrotnt tools (`get_schema`, `submit_problems`, ...) are not available
 - For quantitative topics, prefer a template: one statement with `{placeholders}` and a seeded `generate(seed)`. One template becomes many verified variants.
 - Code problems give a starter, a correct reference and a deliberately wrong solution per language, with visible example tests and at least two hidden ones. The wrong solution must be plausible (an off-by-one, a missed edge case) so it proves the tests have teeth.
 - Trivia has no reference solution. It cites sources instead: see `references/subjects/trivia.md`.
+
+## Reporting back: no spoilers
+
+The user practises on the problems you write, so your reply must not solve them. When you finish, report only how many items were inserted or rejected, with their subjects, topics, difficulties and types. Never show answers, options marked correct, hints, explanations or reference solutions, and do not paraphrase a statement so closely that it can be solved from your reply. This applies to submitting, repairing and backfilling alike. If something was rejected, fix it without quoting the key back, unless the user asks to see it.
 
 ## Hints and explanations
 
