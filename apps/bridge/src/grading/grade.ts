@@ -1,6 +1,6 @@
 import { checkEquivalent } from "@brainrotnt/math-engine";
-import { describeTestFailure, runTests } from "../../content/run-tests";
-import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
+import { describeTestFailure, runTests } from "../content/run-tests";
+import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
 
 export type GradeResult =
   | { status: "graded"; correct: boolean; expected: string; detail?: string }

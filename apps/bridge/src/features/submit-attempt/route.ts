@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { gradeAttempt } from "./grade";
+import { gradeAttempt } from "../../grading/grade";
 import { findProblemForGrading, recordAttempt } from "./query";
 import { submitAttemptBody } from "./schema";
 

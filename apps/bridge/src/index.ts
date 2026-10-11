@@ -9,6 +9,12 @@ import { flagProblemRoute } from "./features/flag-problem/route";
 import { getNextProblemRoute } from "./features/get-next-problem/route";
 import { sessionSummaryRoute } from "./features/session-summary/route";
 import { submitAttemptRoute } from "./features/submit-attempt/route";
+import { answerSessionQuestionRoute } from "./features/answer-session-question/route";
+import { endSessionRoute } from "./features/end-session/route";
+import { getCurrentSessionRoute } from "./features/get-current-session/route";
+import { getSessionScoreRoute } from "./features/get-session-score/route";
+import { skipSessionQuestionRoute } from "./features/skip-session-question/route";
+import { startSessionRoute } from "./features/start-session/route";
 
 const app = new Hono();
 app.use("*", localOnly);
@@ -31,6 +37,9 @@ app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
 app.route("/api/session-summary", sessionSummaryRoute);
+for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute]) {
+  app.route("/api/sessions", route);
+}
 
 app.route("/mcp", mcpRoute);
 

@@ -8,6 +8,13 @@
       "when": 1791654569575,
       "tag": "0000_medical_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791684829380,
+      "tag": "0001_sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { problemSpec, storedAnswer } from "../../content/problem-spec";
-import { codeSpec } from "../../test-support";
+import { problemSpec, storedAnswer } from "../content/problem-spec";
+import { codeSpec } from "../test-support";
 import { grade, gradeAttempt, parseNumericInput } from "./grade";
 
 const numeric = (value: number, tolerance = 0.01, unit?: string) => ({ value, tolerance, unit });

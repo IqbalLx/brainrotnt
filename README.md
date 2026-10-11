@@ -74,6 +74,10 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 - **Code:** submit `{language, code}` (`python` or `javascript`). The bridge runs your code in the [sandbox](#sandbox-for-generated-code) against the problem's tests, calling the problem's function (usually `solve`) once per test with JSON arguments, and compares what it returns with the expected JSON value (numbers get 1e-9 relative slack, everything else must match exactly). Every test must pass. The visible tests are shown with the problem; the hidden ones are not, so a failure on a hidden test tells you the input and what you returned, never the expected value. A syntax error or a missing function is rejected without recording an attempt; an infinite loop (5 second limit) or an exception on a test counts as incorrect. After an attempt you are shown a reference solution.
 - Input that cannot be parsed (for example `banana`, or `y^2` when the problem uses `x`) is rejected without being recorded as an attempt.
 
+## Sessions and scoring
+
+A session is a fixed set of questions (default 5) chosen when it starts: problems you have never seen come first, then the ones seen longest ago. A correct answer earns 1 point, minus 0.25 for each hint opened; a wrong or skipped one earns nothing. A session ends when every question is resolved (`completed`), when you end it (`ended_early`), or when a new one starts while it is open (`abandoned`).
+
 ## API
 
 | Endpoint | Purpose |
@@ -81,6 +85,12 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 | `GET /api/health` | liveness check |
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}`, where `answer` is a number, a string, an option index, or `{language, code}`; replies `{attemptId, correct, expected, detail}` |
+| `POST /api/sessions` | start a session: `{subjects, minDifficulty, maxDifficulty, size, startedBy}`; picks `size` problems (never-seen first, then least recently seen) and abandons any open session; `404` when none match |
+| `GET /api/sessions/current` | the open session with its current question, `404` when there is none |
+| `POST /api/sessions/:id/answer` | grade and record the current question: `{position, answer, secondsSpent, agentState}`; replies with the result, the credit and the updated session |
+| `POST /api/sessions/:id/skip` | resolve the current question with no credit: `{position}` |
+| `POST /api/sessions/:id/end` | end the session early; unanswered questions earn nothing |
+| `GET /api/sessions/:id/score` | the score screen, once the session has ended |
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
 | `GET /api/session-summary?since=<ISO time>` | attempts, correct, accuracy and a per-subject breakdown since that time |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |

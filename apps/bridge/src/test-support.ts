@@ -1,5 +1,5 @@
 import { db } from "./db/client";
-import { attempts, flags, problems } from "./db/schema";
+import { attempts, flags, problems, sessionItems, sessions } from "./db/schema";
 
 let counter = 0;
 
@@ -35,7 +35,9 @@ export const json = async (res: Response) => (await res.json()) as Record<string
 
 // Test files share one temp database, so every test starts from empty tables.
 export async function resetDb() {
+  await db.delete(sessionItems);
   await db.delete(attempts);
+  await db.delete(sessions);
   await db.delete(flags);
   await db.delete(problems);
 }
