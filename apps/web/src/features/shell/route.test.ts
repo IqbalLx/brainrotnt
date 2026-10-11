@@ -8,6 +8,8 @@ describe("routes", () => {
     expect(parseRoute("#/review")).toEqual({ page: "review", sessionId: null });
     expect(parseRoute("#/review/abc")).toEqual({ page: "review", sessionId: "abc" });
     expect(parseRoute("#/nowhere")).toEqual({ page: "exercise" });
+    expect(parseRoute("#/bank")).toEqual({ page: "bank" });
+    expect(hrefFor({ page: "bank" })).toBe("#/bank");
     expect(hrefFor({ page: "review", sessionId: "abc" })).toBe("#/review/abc");
     expect(hrefFor({ page: "exercise" })).toBe("#/");
   });

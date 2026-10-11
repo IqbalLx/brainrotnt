@@ -4,6 +4,7 @@ import { hrefFor, type Route } from "./useRoute";
 const LINKS: { label: string; route: Route }[] = [
   { label: "Exercise", route: { page: "exercise" } },
   { label: "Review", route: { page: "review", sessionId: null } },
+  { label: "Problem bank", route: { page: "bank" } },
 ];
 
 export function Nav({ current }: { current: Route["page"] }) {

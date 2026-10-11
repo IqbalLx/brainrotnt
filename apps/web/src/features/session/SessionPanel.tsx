@@ -2,21 +2,20 @@ import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProblemCard } from "../exercise-engine/ProblemCard";
-import type { CalculatorTier } from "../settings/settings";
-import { formatPoints } from "./format";
+import type { Settings } from "../settings/settings";
+import { formatPoints, SUBJECT_LABEL } from "./format";
 import { hrefFor } from "../shell/useRoute";
 import { SessionProgress } from "./SessionProgress";
 import type { useSession } from "./useSession";
 
 interface SessionPanelProps {
   session: ReturnType<typeof useSession>;
-  calculatorCeiling: CalculatorTier;
-  sessionSize: number;
+  settings: Settings;
   agentWorking: boolean;
   onStart: () => void;
 }
 
-export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWorking, onStart }: SessionPanelProps) {
+export function SessionPanel({ session, settings, agentWorking, onStart }: SessionPanelProps) {
   const { view, phase, result, message, flagged, score } = session;
 
   if (phase === "loading" || phase === "starting") {
@@ -44,6 +43,8 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
   }
 
   if (phase === "none" || phase === "empty") {
+    const subjects = settings.subjects.map((id) => SUBJECT_LABEL[id] ?? id).join(", ");
+    const levels = settings.minDifficulty === settings.maxDifficulty ? `${settings.minDifficulty}` : `${settings.minDifficulty}–${settings.maxDifficulty}`;
     return (
       <Card>
         <CardHeader>
@@ -54,14 +55,30 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
                 Pick more subjects, widen the difficulty range, or run <code className="text-code">bun run db:seed</code>.
               </>
             ) : (
-              `A session of ${sessionSize} questions starts by itself when your agent starts working, or start one now.`
+              "A session starts by itself when your agent starts working, or start one now."
             )}
           </CardDescription>
         </CardHeader>
-        <div>
+        <dl className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">
+          {[
+            ["Subjects", subjects],
+            ["Questions", String(settings.sessionSize)],
+            ["Difficulty", levels],
+            ["Calculator", settings.calculator],
+          ].map(([term, value]) => (
+            <div key={term} className="flex items-baseline gap-2">
+              <dt className="text-label uppercase text-ink-faint">{term}</dt>
+              <dd className="text-code text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="flex flex-wrap items-center gap-3">
           <Button onClick={onStart}>
             <Play className="size-4" aria-hidden />
             Start session
+          </Button>
+          <Button asChild variant="ghost">
+            <a href={hrefFor({ page: "bank" })}>Change settings</a>
           </Button>
         </div>
       </Card>
@@ -98,7 +115,7 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
         result={result}
         message={message}
         flagged={flagged}
-        calculatorCeiling={calculatorCeiling}
+        calculatorCeiling={settings.calculator}
         onSubmit={session.submit}
         onFlag={session.flag}
         onNext={session.next}
