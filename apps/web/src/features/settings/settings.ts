@@ -1,9 +1,10 @@
+import { CALCULATOR_TIERS, type CalculatorTier } from "@brainrotnt/math-engine/tiers";
+
+export { CALCULATOR_TIERS, type CalculatorTier };
+
 export const SUBJECT_IDS = ["math", "stats", "physics"] as const;
 export type SubjectId = (typeof SUBJECT_IDS)[number];
 
-// Ordered from least to most capable.
-export const CALCULATOR_TIERS = ["none", "basic", "scientific", "stats"] as const;
-export type CalculatorTier = (typeof CALCULATOR_TIERS)[number];
 
 export interface Settings {
   subject: SubjectId;

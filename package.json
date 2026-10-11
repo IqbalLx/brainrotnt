@@ -2,7 +2,8 @@
   "name": "brainrotnt",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev:bridge": "bun --filter bridge dev",
@@ -10,7 +11,7 @@
     "db:generate": "bun --filter bridge db:generate",
     "db:migrate": "bun --filter bridge db:migrate",
     "db:seed": "bun --filter bridge db:seed",
-    "test": "bun --filter bridge test && bun --filter web test",
+    "test": "bun --filter bridge test && bun --filter web test && bun --filter @brainrotnt/math-engine test",
     "import": "bun run apps/bridge/src/features/import-problems/cli.ts"
   }
 }

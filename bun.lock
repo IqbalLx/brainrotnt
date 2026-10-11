@@ -24,13 +24,13 @@
       "name": "web",
       "version": "0.0.0",
       "dependencies": {
+        "@brainrotnt/math-engine": "workspace:*",
         "@excalidraw/excalidraw": "^0.18.1",
         "@radix-ui/react-slot": "^1.4.0",
         "@tailwindcss/vite": "^4.3.3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^1.55.0",
-        "mathjs": "^15.2.0",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "tailwind-merge": "^3.7.0",
@@ -47,11 +47,19 @@
         "vite-plugin-static-copy": "^4.1.1",
       },
     },
+    "packages/math-engine": {
+      "name": "@brainrotnt/math-engine",
+      "dependencies": {
+        "mathjs": "^15.2.0",
+      },
+    },
   },
   "packages": {
     "@antfu/install-pkg": ["@antfu/install-pkg@2.1.0", "", { "dependencies": { "package-manager-detector": "^1.8.0", "tinyexec": "^1.3.1" } }, "sha512-sdg9NxU3zR4Mnawfbc/x6GB5Wf17WYud5qOuEuxXjaKpYpMkISSJEjItGebXJ2bQ4DIcly4NYH23mtkGJjvKUw=="],
 
     "@babel/runtime": ["@babel/runtime@7.29.10", "", {}, "sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA=="],
+
+    "@brainrotnt/math-engine": ["@brainrotnt/math-engine@workspace:packages/math-engine"],
 
     "@braintree/sanitize-url": ["@braintree/sanitize-url@6.0.2", "", {}, "sha512-Tbsj02wXCbqGmzdnXNk0SOF19ChhRU70BsroIi4Pm6Ehp56in6vch94mfbdQ17DozxkL3BAVjbZ4Qc1a0HFRAg=="],
 
