@@ -2,7 +2,7 @@ import { CALCULATOR_TIERS, type CalculatorTier } from "@brainrotnt/math-engine/t
 
 export { CALCULATOR_TIERS, type CalculatorTier };
 
-export const SUBJECT_IDS = ["math", "stats", "physics"] as const;
+export const SUBJECT_IDS = ["math", "stats", "physics", "code"] as const;
 export type SubjectId = (typeof SUBJECT_IDS)[number];
 
 

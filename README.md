@@ -4,7 +4,7 @@ Brainrot, not. A cure for the vibe-coded, doom-scrolled brain: solve short STEM 
 
 The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and shows a banner for its state (idle, working, blocked, done) next to a practice problem. A blocked agent always interrupts.
 
-> Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Programming problems are graded by the bridge, but the editor in the browser is not built yet.
+> Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Pick the Code subject for programming problems you solve in an in-browser editor.
 
 ## Prerequisites
 
@@ -87,7 +87,7 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 
 ## Settings
 
-The bar above the problem sets the subject, a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+The bar above the problem sets the subject (Math, Stats, Physics or Code), a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
 
 ## Adding problems with Claude Code
 
@@ -143,6 +143,10 @@ The whole API, including `/mcp`, only answers requests addressed to `localhost`,
 Problems added through the content pipeline carry code (reference solutions and generators) written by an AI agent, possibly from injected source material, and students submit code of their own, so none of it is trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
 
 Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH. JavaScript is run by the Bun that runs the bridge, under the same limits.
+
+## Code editor
+
+Programming problems use a [CodeMirror](https://codemirror.net/) editor with Python and JavaScript syntax highlighting. It is fetched only when a code problem is shown (about 158 kB gzipped), so it costs nothing on the other subjects, and it takes its colours from the design tokens, so it follows the light and dark themes. Each language keeps its own draft while you switch between them, and "Reset to starter" restores the original code. Ctrl or ⌘ with Enter submits; Tab indents, and Esc then Tab moves focus out of the editor so the keyboard is never trapped. The visible tests are listed as examples in the language you picked (`None` and `True` in Python, `null` and `true` in JavaScript), and after an attempt you see how many tests passed, the first failing call and a reference solution.
 
 ## Drawing board
 

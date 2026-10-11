@@ -51,10 +51,15 @@ describe("parseStoredSettings", () => {
     expect(parseStoredSettings(JSON.stringify(stored))).toEqual(stored as never);
   });
 
+  test("the code subject is remembered", () => {
+    const stored = { subject: "code", minDifficulty: 1, maxDifficulty: 3, calculator: "none" };
+    expect(parseStoredSettings(JSON.stringify(stored))).toEqual(stored as never);
+  });
+
   test("falls back to defaults for anything invalid", () => {
     expect(parseStoredSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings("not json")).toEqual(DEFAULT_SETTINGS);
-    expect(parseStoredSettings(JSON.stringify({ subject: "code", minDifficulty: 1, maxDifficulty: 5, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseStoredSettings(JSON.stringify({ subject: "history", minDifficulty: 1, maxDifficulty: 5, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 4, maxDifficulty: 2, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 0, maxDifficulty: 9, calculator: "basic" }))).toEqual(DEFAULT_SETTINGS);
     expect(parseStoredSettings(JSON.stringify({ subject: "math", minDifficulty: 1, maxDifficulty: 5, calculator: "graphing" }))).toEqual(DEFAULT_SETTINGS);

@@ -5,6 +5,7 @@ const SUBJECTS: { id: SubjectId; label: string }[] = [
   { id: "math", label: "Math" },
   { id: "stats", label: "Stats" },
   { id: "physics", label: "Physics" },
+  { id: "code", label: "Code" },
 ];
 
 const TIER_LABEL: Record<CalculatorTier, string> = { none: "None", basic: "Basic", scientific: "Scientific", stats: "Stats" };
