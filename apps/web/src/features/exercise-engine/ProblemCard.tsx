@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
+import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
 import { AnswerInput } from "./AnswerInput";
 import type { AttemptResult, Phase, Problem } from "./useExercise";
 
@@ -92,6 +93,7 @@ function ActiveProblem({
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [usedCalculator, setUsedCalculator] = useState(false);
+  const [usedDrawing, setUsedDrawing] = useState(false);
   const tier = effectiveTier(problem.tools.calculator, calculatorCeiling);
 
   const locked = phase === "submitting" || phase === "result";
@@ -100,7 +102,10 @@ function ActiveProblem({
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
-    onSubmit(problem.type === "mcq" ? (choice as number) : text.trim(), usedCalculator ? ["calculator"] : []);
+    onSubmit(problem.type === "mcq" ? (choice as number) : text.trim(), [
+      ...(usedCalculator ? ["calculator"] : []),
+      ...(usedDrawing ? ["draw"] : []),
+    ]);
   }
 
   return (
@@ -159,6 +164,7 @@ function ActiveProblem({
           <Badge variant="muted">Draw: {problem.tools.draw ? "on" : "off"}</Badge>
         </div>
       </Card>
+      {problem.tools.draw && <DrawingBoardPanel onDraw={() => setUsedDrawing(true)} />}
       {tier !== "none" && (
         <Suspense fallback={null}>
           <CalculatorPanel tier={tier} onUsed={() => setUsedCalculator(true)} />
