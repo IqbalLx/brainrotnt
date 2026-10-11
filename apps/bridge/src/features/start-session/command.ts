@@ -28,12 +28,26 @@ async function pickProblems(body: StartSessionBody): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-export async function startSession(body: StartSessionBody, now = new Date()): Promise<SessionRow | null> {
+export interface StartedSession {
+  session: SessionRow;
+  /** True when an agent run found a session already open and kept it instead of starting another. */
+  resumed: boolean;
+}
+
+export async function startSession(body: StartSessionBody, now = new Date()): Promise<StartedSession | null> {
+  const open = await db.select({ id: sessions.id }).from(sessions).where(isNull(sessions.endedAt));
+
+  // An agent run never discards practice in progress: another tab, or a page that has not loaded the
+  // open session yet, may ask for a new one. Only a person starting one by hand replaces it.
+  if (body.startedBy === "agent" && open.length > 0) {
+    const session = await findSession(open[0].id);
+    if (session) return { session, resumed: true };
+  }
+
   const picked = await pickProblems(body);
   if (picked.length === 0) return null;
 
-  // Only one session is open at a time: starting a new one abandons the old.
-  const open = await db.select({ id: sessions.id }).from(sessions).where(isNull(sessions.endedAt));
+  // Only one session is open at a time: starting a new one by hand abandons the old.
   for (const { id } of open) await finish(id, "abandoned", now);
 
   const id = crypto.randomUUID();
@@ -52,5 +66,6 @@ export async function startSession(body: StartSessionBody, now = new Date()): Pr
       .run();
     picked.forEach((problemId, position) => tx.insert(sessionItems).values({ sessionId: id, position, problemId }).run());
   });
-  return findSession(id);
+  const session = await findSession(id);
+  return session && { session, resumed: false };
 }

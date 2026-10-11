@@ -15,11 +15,11 @@ import { useHealth } from "@/features/shell/useHealth";
 import { useRoute } from "@/features/shell/useRoute";
 
 export default function App() {
-  const { event, status, since, runStarts, connected } = useAgentState();
+  const { event, status, since, finishedAt, runStarts, connected } = useAgentState();
   const { settings, update } = useSettings();
   const session = useSession(status);
   const timer = useRunTimer(status);
-  const reminders = useReminders(status, since, session.open);
+  const reminders = useReminders(status, since, finishedAt, session.open);
   const health = useHealth();
   const { route, navigate } = useRoute();
 
