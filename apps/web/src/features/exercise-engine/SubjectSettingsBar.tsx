@@ -27,8 +27,8 @@ export function SubjectSettingsBar({ settings, onChange }: { settings: Settings;
               aria-pressed={on}
               onClick={() => onChange({ subjects: toggleSubject(subjects, id) })}
               className={cn(
-                "rounded-full px-4 py-2 text-label uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-                on ? "bg-brand text-on-brand" : "bg-surface-sunken text-ink-muted hover:text-ink",
+                "rounded-full border px-3 py-1.5 text-label uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+                on ? "border-brand/50 bg-brand/15 text-brand-ink" : "border-border text-ink-muted hover:bg-surface-high hover:text-ink",
               )}
             >
               {label}

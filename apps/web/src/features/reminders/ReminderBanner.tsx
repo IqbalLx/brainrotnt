@@ -25,20 +25,20 @@ export function ReminderBanner({ reminder, event, onAct, onSnooze }: ReminderBan
   const blocked = reminder.kind === "blocked";
   const button = cn(
     "rounded-full px-3 py-1 text-label uppercase focus-visible:outline-2 focus-visible:outline-offset-2",
-    blocked ? "focus-visible:outline-on-blocked" : "focus-visible:outline-on-success",
+    "focus-visible:outline-focus-ring",
   );
 
   return (
-    <div role="alert" className={cn("sticky top-0 z-10 w-full", blocked ? "bg-blocked text-on-blocked" : "bg-success text-on-success")}>
+    <div role="alert" className={cn("sticky top-0 z-10 w-full border-b text-ink backdrop-blur", blocked ? "border-blocked/50 bg-blocked/15" : "border-success/50 bg-success/15")}>
       <div className="mx-auto flex max-w-2xl flex-col gap-3 px-6 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className={cn("size-2 shrink-0 rounded-full", blocked ? "bg-on-blocked" : "bg-on-success")} aria-hidden />
-          <span className="text-heading-sm uppercase">{copy.title}</span>
+          <span className={cn("size-2 shrink-0 rounded-full", blocked ? "bg-blocked" : "bg-success")} aria-hidden />
+          <span className={cn("text-label uppercase", blocked ? "text-blocked" : "text-success")}>{copy.title}</span>
           {event && <span className="truncate text-body-sm opacity-85">{describe(event)}</span>}
         </div>
         <p className="text-body-sm opacity-90">{copy.body}</p>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={onAct} className={cn(button, blocked ? "bg-on-blocked text-blocked" : "bg-on-success text-success")}>
+          <button type="button" onClick={onAct} className={cn(button, blocked ? "bg-blocked text-on-blocked" : "bg-success text-on-success")}>
             {copy.act}
           </button>
           <span className="ml-2 flex items-center gap-1 text-body-sm opacity-85">
@@ -51,7 +51,7 @@ export function ReminderBanner({ reminder, event, onAct, onSnooze }: ReminderBan
               type="button"
               aria-label={`Remind me in ${option.label}`}
               onClick={() => onSnooze(option.ms)}
-              className={cn(button, "border", blocked ? "border-on-blocked/40" : "border-on-success/40")}
+              className={cn(button, "border", blocked ? "border-blocked/50 text-blocked" : "border-success/50 text-success")}
             >
               {option.label}
             </button>
