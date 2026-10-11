@@ -16,6 +16,8 @@
     "skills:sync": "sh scripts/sync-skills.sh",
     "skills:check": "sh scripts/sync-skills.sh --check",
     "skills:schema": "bun run scripts/skill-schema.ts",
-    "skills:schema:check": "bun run scripts/skill-schema.ts --check"
+    "skills:schema:check": "bun run scripts/skill-schema.ts --check",
+    "debug:uhp": "bun run scripts/uhp-tap.ts",
+    "debug:sse": "bun run scripts/sse-tap.ts"
   }
 }

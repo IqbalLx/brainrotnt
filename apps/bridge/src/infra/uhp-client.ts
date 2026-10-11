@@ -15,13 +15,63 @@ export interface UhpClient {
   stop(): void;
   current(): AgentStateEvent | null;
   onStateChange(listener: (event: AgentStateEvent) => void): () => void;
+  /** What the client has seen and done, for GET /api/debug/agent-state. */
+  debug(): UhpDebugSnapshot;
+  /** Publish a state as if it came from Luvus, to test the SSE stream and the UI on their own. */
+  inject(event: Omit<AgentStateEvent, "at">): void;
+}
+
+/** One frame on the wire and what the client did with it. */
+export interface UhpFrameRecord {
+  at: string;
+  channel: "subscribe" | "request";
+  direction: "out" | "in";
+  frame: unknown;
+  outcome: string;
+}
+
+export interface UhpDebugSnapshot {
+  mode: "luvus" | "mock";
+  socketPath: string | null;
+  connection: "idle" | "connecting" | "subscribed" | "disconnected" | "stopped";
+  subscribedAt: string | null;
+  lastFrameAt: string | null;
+  lastError: string | null;
+  connects: number;
+  framesReceived: number;
+  eventsApplied: number;
+  eventsIgnored: number;
+  /** Frames received per event name, so a renamed or missing event shows up even when it is not kept in `recent`. */
+  eventCounts: Record<string, number>;
+  publishes: number;
+  listeners: number;
+  panes: unknown[];
+  current: AgentStateEvent | null;
+  recent: UhpFrameRecord[];
 }
 
 type Listener = (event: AgentStateEvent) => void;
 
+// Set UHP_DEBUG=1 to also print every frame and every published state to the bridge's console.
+const DEBUG_LOG = process.env.UHP_DEBUG === "1";
+const RECENT_FRAMES = 200;
+
 class StateHub {
   private listeners = new Set<Listener>();
   private last: AgentStateEvent | null = null;
+  protected stats = {
+    connection: "idle" as UhpDebugSnapshot["connection"],
+    subscribedAt: null as string | null,
+    lastFrameAt: null as string | null,
+    lastError: null as string | null,
+    connects: 0,
+    framesReceived: 0,
+    eventsApplied: 0,
+    eventsIgnored: 0,
+    eventCounts: {} as Record<string, number>,
+    publishes: 0,
+  };
+  private recent: UhpFrameRecord[] = [];
 
   current(): AgentStateEvent | null {
     return this.last;
@@ -32,8 +82,35 @@ class StateHub {
     return () => this.listeners.delete(listener);
   }
 
+  inject(event: Omit<AgentStateEvent, "at">): void {
+    this.record("subscribe", "in", event, "injected through /api/debug/agent-state");
+    this.emit({ ...event, at: new Date() });
+  }
+
+  debug(): UhpDebugSnapshot {
+    return {
+      mode: "mock",
+      socketPath: null,
+      ...this.stats,
+      eventCounts: { ...this.stats.eventCounts },
+      listeners: this.listeners.size,
+      panes: [],
+      current: this.last,
+      recent: [...this.recent],
+    };
+  }
+
+  protected record(channel: UhpFrameRecord["channel"], direction: UhpFrameRecord["direction"], frame: unknown, outcome: string): void {
+    const entry = { at: new Date().toISOString(), channel, direction, frame, outcome };
+    this.recent.push(entry);
+    if (this.recent.length > RECENT_FRAMES) this.recent.shift();
+    if (DEBUG_LOG) console.log(`[uhp-debug] ${entry.at} ${channel} ${direction === "out" ? "->" : "<-"} ${JSON.stringify(frame)} :: ${outcome}`);
+  }
+
   protected emit(event: AgentStateEvent): void {
     this.last = event;
+    this.stats.publishes += 1;
+    if (DEBUG_LOG) console.log(`[uhp-debug] publish ${event.status} pane=${event.pane} to ${this.listeners.size} listener(s)`);
     for (const listener of this.listeners) listener(event);
   }
 }
@@ -94,8 +171,13 @@ class LuvusUhpClient extends StateHub implements UhpClient {
     void this.connect();
   }
 
+  override debug(): UhpDebugSnapshot {
+    return { ...super.debug(), mode: "luvus", socketPath: this.socketPath, panes: [...this.panes.values()] };
+  }
+
   stop(): void {
     this.stopped = true;
+    this.stats.connection = "stopped";
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.subscription?.end();
   }
@@ -105,7 +187,10 @@ class LuvusUhpClient extends StateHub implements UhpClient {
     try {
       await this.subscribe();
     } catch (error) {
-      console.warn(`[uhp-client] connect failed: ${error instanceof Error ? error.message : error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[uhp-client] connect failed: ${message}`);
+      this.stats.connection = "disconnected";
+      this.stats.lastError = message;
       this.scheduleReconnect();
     }
   }
@@ -122,13 +207,17 @@ class LuvusUhpClient extends StateHub implements UhpClient {
     return new Promise((resolve, reject) => {
       let buffer = "";
       let acknowledged = false;
+      this.stats.connection = "connecting";
+      this.stats.connects += 1;
 
       Bun.connect({
         unix: this.socketPath,
         socket: {
           open: (socket) => {
             this.subscription = socket;
-            socket.write(`${JSON.stringify({ id: "sub", method: "events.subscribe", params: {} })}\n`);
+            const request = { id: "sub", method: "events.subscribe", params: {} };
+            this.record("subscribe", "out", request, "sent");
+            socket.write(`${JSON.stringify(request)}\n`);
           },
           data: (socket, chunk) => {
             buffer += chunk.toString("utf8");
@@ -138,34 +227,52 @@ class LuvusUhpClient extends StateHub implements UhpClient {
               buffer = buffer.slice(newline + 1);
               if (!line) continue;
 
+              this.stats.framesReceived += 1;
+              this.stats.lastFrameAt = new Date().toISOString();
               let frame: Record<string, any>;
               try {
                 frame = JSON.parse(line);
               } catch {
+                this.record("subscribe", "in", line, "dropped: not JSON");
                 continue;
               }
 
               if (!acknowledged) {
                 if (frame.result?.type !== "subscription_started") {
+                  this.record("subscribe", "in", frame, "subscribe refused: expected result.type subscription_started");
                   reject(new Error(`subscribe refused: ${JSON.stringify(frame.error ?? frame)}`));
                   socket.end();
                   return;
                 }
+                this.record("subscribe", "in", frame, "subscription acknowledged");
                 acknowledged = true;
+                this.stats.connection = "subscribed";
+                this.stats.subscribedAt = new Date().toISOString();
+                this.stats.lastError = null;
                 this.panes.clear();
                 this.eventPanes.clear();
                 resolve();
                 void this.seed();
                 continue;
               }
-              this.handleEvent(frame, socket);
+              const name = String(frame.event ?? "(none)");
+              this.stats.eventCounts[name] = (this.stats.eventCounts[name] ?? 0) + 1;
+              const outcome = this.handleEvent(frame, socket);
+              if (outcome.startsWith("applied")) this.stats.eventsApplied += 1;
+              else this.stats.eventsIgnored += 1;
+              // Luvus streams many events the app has no use for (terminal.output_ready several times a
+              // second); keeping them would push the interesting frames out. They are still counted above.
+              if (!outcome.startsWith("ignored: unhandled event")) this.record("subscribe", "in", frame, outcome);
             }
           },
           close: () => {
+            if (!this.stopped) this.stats.connection = "disconnected";
+            this.record("subscribe", "in", null, "connection closed");
             if (!acknowledged) reject(new Error("connection closed before subscription ack"));
             else this.scheduleReconnect();
           },
           error: (_socket, error) => {
+            this.stats.lastError = error.message;
             if (!acknowledged) reject(error);
           },
         },
@@ -188,28 +295,31 @@ class LuvusUhpClient extends StateHub implements UhpClient {
     }
   }
 
-  private handleEvent(frame: Record<string, any>, socket: { end(): void }): void {
+  /** Applies one event frame and says what happened, for the debug log. */
+  private handleEvent(frame: Record<string, any>, socket: { end(): void }): string {
     switch (frame.event) {
       case "pane.agent_status_changed": {
         const state = toPaneState(frame.data);
-        if (!state) return;
+        if (!state) return "ignored: data has no string pane and status";
         this.eventPanes.add(state.pane);
         this.panes.set(state.pane, state);
         this.publish();
-        return;
+        return `applied: pane ${state.pane} is ${state.status}`;
       }
       case "pane.closed": {
         const pane = frame.data?.pane;
-        if (typeof pane !== "string") return;
+        if (typeof pane !== "string") return "ignored: data.pane is not a string";
         this.eventPanes.add(pane);
         this.panes.delete(pane);
         this.publish();
-        return;
+        return `applied: pane ${pane} closed`;
       }
       case "events.resync_required":
         // The cursor or queue was lost; closing triggers a fresh subscribe and seed.
         socket.end();
-        return;
+        return "applied: resync required, reconnecting";
+      default:
+        return frame.event === undefined ? "ignored: frame has no event field" : `ignored: unhandled event ${frame.event}`;
     }
   }
 
@@ -248,7 +358,9 @@ class LuvusUhpClient extends StateHub implements UhpClient {
         unix: this.socketPath,
         socket: {
           open: (socket) => {
-            socket.write(`${JSON.stringify({ id: "req", method, params })}\n`);
+            const request = { id: "req", method, params };
+            this.record("request", "out", request, "sent");
+            socket.write(`${JSON.stringify(request)}\n`);
           },
           data: (socket, chunk) => {
             buffer += chunk.toString("utf8");
@@ -256,6 +368,7 @@ class LuvusUhpClient extends StateHub implements UhpClient {
             if (newline < 0) return;
             try {
               const frame = JSON.parse(buffer.slice(0, newline));
+              this.record("request", "in", frame, frame.error ? `${method} failed` : `${method} reply`);
               if (frame.error) finish(new Error(`${method}: ${JSON.stringify(frame.error)}`));
               else finish(null, frame);
             } catch (error) {
@@ -278,6 +391,7 @@ class MockUhpClient extends StateHub implements UhpClient {
   private step = 0;
 
   async start(): Promise<void> {
+    this.stats.connection = "subscribed";
     this.timer = setInterval(() => {
       const status = this.cycle[this.step % this.cycle.length];
       this.step += 1;
