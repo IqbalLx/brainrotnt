@@ -175,7 +175,8 @@ export function useSession(agentState: AgentState) {
           setPhase("answering");
           return;
         }
-        if (!res.ok) throw new Error(`bridge returned ${res.status}`);
+        // The bridge explains some refusals, such as code answers from another device in network mode.
+        if (!res.ok) throw new Error(typeof body.message === "string" ? body.message : `bridge returned ${res.status}`);
         pending.current = body.session as SessionView;
         setResult({ correct: body.correct, expected: body.expected, detail: body.detail ?? null, credit: body.credit });
         setPhase("result");

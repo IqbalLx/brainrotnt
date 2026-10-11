@@ -1,0 +1,77 @@
+export const DEFAULT_PORT = 8787;
+
+export type Command =
+  | { name: "start"; port: number | null; network: boolean; open: boolean; allowRemoteCode: boolean }
+  | { name: "doctor" }
+  | { name: "setup-claude" }
+  | { name: "update"; force: boolean }
+  | { name: "uninstall"; purge: boolean; yes: boolean }
+  | { name: "version" }
+  | { name: "help" }
+  | { name: "error"; message: string };
+
+export const HELP = `brainrotnt: practise STEM problems while your coding agent works
+
+Usage:
+  brnt [options]           start brainrotnt and print its link (same as brainrotnt)
+  brnt doctor              check the installation, Python, the sandbox, Luvus and Claude Code
+  brnt setup claude        register the MCP server with Claude Code and install the problem skill
+  brnt update [--force]    install the latest release; your data is kept
+  brnt uninstall [--purge] remove the app (--purge also deletes your data)
+  brnt version             print the version
+
+Options for starting:
+  -p, --port <n>           use exactly this port (default: 8787, or the next free one)
+  -n, --network            also serve on your local network, with an access key and a QR code
+      --allow-remote-code  in network mode, let other devices run code answers on this machine
+  -o, --open               open the browser right away
+  -h, --help               show this help
+
+Environment:
+  BRAINROTNT_HOME          where data lives (default: ~/.brainrotnt)
+  LUVUS_SOCKET_PATH        the Luvus socket (default: ~/.luvus/luvus.sock)
+  BRAINROTNT_ALLOW_UNSANDBOXED=1  run reference and code answers without network isolation
+`;
+
+export function parseArgs(argv: string[]): Command {
+  const [first, ...rest] = argv;
+  switch (first) {
+    case "doctor":
+      return rest.length ? unexpected(rest[0]) : { name: "doctor" };
+    case "setup":
+      if (rest[0] !== "claude" || rest.length > 1) return { name: "error", message: "usage: brnt setup claude" };
+      return { name: "setup-claude" };
+    case "update":
+      return rest.every((a) => a === "--force") ? { name: "update", force: rest.includes("--force") } : unexpected(rest.find((a) => a !== "--force")!);
+    case "uninstall": {
+      const bad = rest.find((a) => a !== "--purge" && a !== "--yes" && a !== "-y");
+      return bad ? unexpected(bad) : { name: "uninstall", purge: rest.includes("--purge"), yes: rest.includes("--yes") || rest.includes("-y") };
+    }
+    case "version":
+    case "--version":
+    case "-v":
+      return { name: "version" };
+    case "help":
+      return { name: "help" };
+  }
+
+  const start: Extract<Command, { name: "start" }> = { name: "start", port: null, network: false, open: false, allowRemoteCode: false };
+  const args = first === "start" ? rest : argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "-h" || arg === "--help") return { name: "help" };
+    else if (arg === "-n" || arg === "--network") start.network = true;
+    else if (arg === "-o" || arg === "--open") start.open = true;
+    else if (arg === "--allow-remote-code") start.allowRemoteCode = true;
+    else if (arg === "-p" || arg === "--port" || arg.startsWith("--port=")) {
+      const value = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : args[++i];
+      const port = Number(value);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) return { name: "error", message: `invalid port: ${value ?? "(missing)"}` };
+      start.port = port;
+    } else return unexpected(arg);
+  }
+  if (start.allowRemoteCode && !start.network) return { name: "error", message: "--allow-remote-code only applies with --network" };
+  return start;
+}
+
+const unexpected = (arg: string): Command => ({ name: "error", message: `unknown argument: ${arg} (see brnt --help)` });

@@ -65,6 +65,17 @@ export function getSandboxMode(): Promise<SandboxMode> {
   return probe;
 }
 
+/** What to tell the person when reference and code answers cannot run isolated; null when they can. */
+export function sandboxWarning(mode: SandboxMode): string | null {
+  if (mode === "unavailable") {
+    return Bun.which("python3")
+      ? "network isolation is unavailable: reference solutions and code answers will not run. Set BRAINROTNT_ALLOW_UNSANDBOXED=1 to run them without it."
+      : "python3 was not found: reference solutions and Python code answers will not run.";
+  }
+  if (mode === "unsandboxed-allowed") return "running reference solutions and code answers WITHOUT network isolation (BRAINROTNT_ALLOW_UNSANDBOXED=1).";
+  return null;
+}
+
 // Test hook: forget the cached probe so a changed environment is re-read.
 export function resetSandboxProbe(): void {
   probe = null;

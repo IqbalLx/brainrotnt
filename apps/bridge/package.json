@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --compile --outfile dist/bridge",
+    "build": "bun run ../../scripts/build-release.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
@@ -16,6 +16,7 @@
     "@modelcontextprotocol/sdk": "^1.32.1",
     "drizzle-orm": "^0.38.3",
     "hono": "^4.6.14",
+    "uqr": "0.1.2",
     "yaml": "^2.9.1",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.25.2"

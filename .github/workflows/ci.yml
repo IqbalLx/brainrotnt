@@ -46,3 +46,10 @@ jobs:
 
       - name: Build
         run: (cd apps/web && bunx vite build)
+
+      # The installable binary: the web build above embedded with the bridge. It must compile and run.
+      - name: Release build
+        run: |
+          bun run build:release -- --skip-web --version ci
+          dir=$(mktemp -d) && tar -xzf dist/release/brainrotnt-ci-linux-x64.tar.gz -C "$dir"
+          test "$("$dir/brainrotnt" --version)" = ci

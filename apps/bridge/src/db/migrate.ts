@@ -1,11 +1,14 @@
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+// `bun run db:migrate`: brings the development database up to date, backing it up first when it
+// already has data and migrations are pending (see migrations.ts). The installed app does the same on start.
+import { dirname, join } from "node:path";
+import { migrateDatabase } from "./migrations";
 
 const DB_PATH = process.env.DB_PATH ?? "./bridge.sqlite";
-
-const sqlite = new Database(DB_PATH);
-const db = drizzle(sqlite);
-
-migrate(db, { migrationsFolder: "./drizzle" });
-console.log(`Migrated ${DB_PATH}`);
+const { applied, backup } = migrateDatabase({
+  dbPath: DB_PATH,
+  source: { folder: "./drizzle" },
+  backupsDir: join(dirname(DB_PATH), "backups"),
+  label: "dev",
+});
+if (backup) console.log(`Backed up to ${backup}`);
+console.log(`Migrated ${DB_PATH} (${applied} applied)`);
