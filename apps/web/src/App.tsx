@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
+import { BankPage } from "@/features/bank/BankPage";
 import { useAgentState } from "@/features/agent-state/useAgentState";
-import { SubjectSettingsBar } from "@/features/exercise-engine/SubjectSettingsBar";
 import { ReminderCard } from "@/features/reminders/ReminderCard";
 import { useReminders } from "@/features/reminders/useReminders";
 import { ReviewPage } from "@/features/review/ReviewPage";
@@ -42,17 +42,17 @@ export default function App() {
     navigate({ page: "exercise" });
     void session.start(settings, "manual");
   };
-  const inSession = session.phase === "answering" || session.phase === "submitting" || session.phase === "result";
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-8">
-          <div className="flex items-center gap-3 sm:gap-6">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-info" aria-hidden />
-              <h1 className="text-code-lg font-semibold text-ink max-sm:sr-only">brainrotnt</h1>
-            </div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2 sm:h-14 sm:flex-nowrap sm:py-0 md:px-8">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-info" aria-hidden />
+            <h1 className="text-code-lg font-semibold text-ink">brainrotnt</h1>
+          </div>
+          {/* On a phone the nav takes its own row under the logo and the agent pill. */}
+          <div className="order-last w-full sm:order-none sm:mr-auto sm:w-auto">
             <Nav current={route.page} />
           </div>
           <AgentPill status={status} event={event} runMs={timer.elapsedMs} />
@@ -74,17 +74,15 @@ export default function App() {
         )}
         {route.page === "review" ? (
           <ReviewPage sessionId={route.sessionId} refresh={endedId} onStartAnother={startFromAnywhere} />
+        ) : route.page === "bank" ? (
+          <BankPage settings={settings} onSettings={update} />
         ) : (
-          <>
-            {!inSession && <SubjectSettingsBar settings={settings} onChange={update} />}
-            <SessionPanel
-              session={session}
-              calculatorCeiling={settings.calculator}
-              sessionSize={settings.sessionSize}
-              agentWorking={status === "working"}
-              onStart={() => void session.start(settings, "manual")}
-            />
-          </>
+          <SessionPanel
+            session={session}
+            settings={settings}
+            agentWorking={status === "working"}
+            onStart={() => void session.start(settings, "manual")}
+          />
         )}
       </main>
 

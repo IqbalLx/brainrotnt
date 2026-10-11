@@ -86,6 +86,8 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}`, where `answer` is a number, a string, an option index, or `{language, code}`; replies `{attemptId, correct, expected, detail}` |
 | `POST /api/sessions` | start a session: `{subjects, minDifficulty, maxDifficulty, size, startedBy}`; picks `size` problems (never-seen first, then least recently seen) and abandons any open session; `404` when none match |
+| `GET /api/coverage` | counts per subject, topic and difficulty, for the problem bank page |
+| `GET /api/flagged` | flagged problems and review notes, without answer keys |
 | `GET /api/sessions?limit=20` | ended sessions, newest first, for the review page |
 | `GET /api/sessions/current` | the open session with its current question, `404` when there is none |
 | `POST /api/sessions/:id/answer` | grade and record the current question: `{position, answer, secondsSpent, agentState}`; replies with the result, the credit and the updated session |
@@ -96,9 +98,17 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `POST /api/flags` | flag a wrong or ambiguous problem: `{problemId, reason?}`; it stops being served |
 | `GET /api/agent-state/stream` | server-sent events with the current agent state |
 
+## Pages
+
+- **Exercise** (`#/`): the current question. On a wide screen the problem and answer sit on the left and the tools (calculator, hints) are tabs on the right (Alt+1, Alt+2); the calculator can copy its result into the answer. A ribbon shows subject, topic, difficulty, a per-question clock and session progress.
+- **Review** (`#/review`): the last session (or any recent one) with accuracy, points, time and hints, then every question with your answer and its explanation. It opens by itself when a session ends.
+- **Problem bank** (`#/bank`): the session settings, coverage per subject and topic, flagged problems and review notes, and a prompt builder: the app cannot start Claude Code, so it writes the request (generate, repair or backfill) for you to copy and paste into it. The browser never receives answer keys from this page.
+
+The header shows the agent (name, project, run time and state); a status bar at the bottom says whether the bridge is reachable, whether the agent feed is live and how untrusted code is run.
+
 ## Settings
 
-The bar above the problem sets the subjects a session draws from (toggle any of Math, Stats, Physics, Code and Trivia; STEM is on by default, at least one stays on), the number of questions per session (3, 5, 10, 15 or 20), a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage and apply to the next session. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
+The bar on the Problem bank page sets the subjects a session draws from (toggle any of Math, Stats, Physics, Code and Trivia; STEM is on by default, at least one stays on), the number of questions per session (3, 5, 10, 15 or 20), a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage and apply to the next session. The calculator tier is a ceiling: each problem declares the tier it allows, and the lower of the two applies. Choosing None acts as strict mode.
 
 ## Adding problems with Claude Code
 
@@ -197,9 +207,9 @@ Both can be snoozed for 30 seconds, 1, 2 or 5 minutes, and come back when the sn
 
 ## Look and feel
 
-The UI follows the brainrotnt design system. Its tokens live in `apps/web/src/index.css` as CSS variables (surfaces, ink, the four state colours, radii, shadows) with Tailwind utilities for each, plus the type styles (`text-body`, `text-label`, `text-heading-sm`, and so on). Dark is the default; the light theme applies when your OS prefers it, or with `data-theme="light"` on `<html>`. shadcn's variable names (`--background`, `--primary`, ...) are mapped onto the same tokens, so components added with `shadcn add` pick up the theme.
+The UI follows "Obsidian Kinetic", a design system made with Google Stitch: layered blue-black surfaces with hairline borders, violet for actions, cyan for live agent state and focus, emerald for success and amber for blocked. Geist sets the reading text and JetBrains Mono the numbers, labels, code and status; both are bundled with the app, so nothing is fetched from a font CDN. Tokens live in `apps/web/src/index.css` as CSS variables with Tailwind utilities for each, plus the type styles (`text-body`, `text-label`, `text-heading-sm`, and so on; `lib/utils.ts` registers them with tailwind-merge so a colour class never drops them). Dark is the default; a light variant applies when your OS prefers it, or with `data-theme="light"` on `<html>`. shadcn's variable names (`--background`, `--primary`, ...) are mapped onto the same tokens.
 
-Agent state names are shown exactly as Luvus reports them (Idle, Working, Blocked, Done). Blocked is the only state that interrupts: it pins a banner to the top of the window.
+Agent state names are shown exactly as Luvus reports them (Idle, Working, Blocked, Done). Blocked and Done interrupt with a card at the top of the page; it never sends anything to the agent.
 
 ## The authoring skill
 
