@@ -116,7 +116,7 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 - **Review** (`#/review`): the last session (or any recent one) with accuracy, points, time and hints, then every question with your answer and its explanation. It opens by itself when a session ends.
 - **Problem bank** (`#/bank`): the session settings, coverage per subject and topic, flagged problems and review notes, and a prompt builder: the app cannot start Claude Code, so it writes the request (generate, repair or backfill) for you to copy and paste into it. The browser never receives answer keys from this page.
 
-The header shows the agent (name, project, run time and state); a status bar at the bottom says whether the bridge is reachable, whether the agent feed is live and how untrusted code is run.
+The header shows the agent (name, project, run time and state); a status bar at the bottom says whether the bridge is reachable, whether the agent feed is live and how untrusted code is run, and links to this repository on GitHub.
 
 ## Settings
 
