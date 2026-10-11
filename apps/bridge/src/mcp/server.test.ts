@@ -42,7 +42,7 @@ describe("MCP endpoint", () => {
 
   test("get_schema returns the problem schema", async () => {
     const { body } = await call("get_schema");
-    expect(body.supported.types).toEqual(["mcq", "numeric"]);
+    expect(body.supported.types).toEqual(["mcq", "numeric", "symbolic"]);
     expect(JSON.stringify(body.problemSpec)).toContain("reference");
   });
 
