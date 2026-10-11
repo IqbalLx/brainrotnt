@@ -18,6 +18,8 @@
     "skills:schema": "bun run scripts/skill-schema.ts",
     "skills:schema:check": "bun run scripts/skill-schema.ts --check",
     "debug:uhp": "bun run scripts/uhp-tap.ts",
-    "debug:sse": "bun run scripts/sse-tap.ts"
+    "debug:sse": "bun run scripts/sse-tap.ts",
+    "brnt": "bun run apps/bridge/src/cli/dev.ts",
+    "build:release": "bun run scripts/build-release.ts"
   }
 }

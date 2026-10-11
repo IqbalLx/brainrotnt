@@ -194,7 +194,7 @@ function symbolicAnswerFor(seed: Seed) {
   return symbolicAnswer.parse({ expression, variables });
 }
 
-const rows: (typeof problems.$inferInsert)[] = SEEDS.map((seed) => {
+const stemRows = (): (typeof problems.$inferInsert)[] => SEEDS.map((seed) => {
   const type: "mcq" | "numeric" | "symbolic" = seed.mcq ? "mcq" : seed.symbolic ? "symbolic" : "numeric";
   const answer = seed.mcq ? mcqAnswer.parse(seed.mcq) : seed.symbolic ? symbolicAnswerFor(seed) : numericAnswer.parse(seed.numeric);
   return {
@@ -244,8 +244,17 @@ async function codeRows(): Promise<(typeof problems.$inferInsert)[]> {
   return out;
 }
 
-rows.push(...(await codeRows()));
+/**
+ * Loads the starter problems. Problems are immutable once verified, so existing ids are left untouched
+ * and this is safe to run again. The installed app runs it on first launch, when the bank is empty.
+ */
+export async function seedStarterProblems(): Promise<{ inserted: number; present: number }> {
+  const rows = [...stemRows(), ...(await codeRows())];
+  const inserted = await db.insert(problems).values(rows).onConflictDoNothing().returning({ id: problems.id });
+  return { inserted: inserted.length, present: rows.length - inserted.length };
+}
 
-// Problems are immutable once verified, so existing ids are left untouched.
-const inserted = await db.insert(problems).values(rows).onConflictDoNothing().returning({ id: problems.id });
-console.log(`Seeded ${inserted.length} new problems (${rows.length - inserted.length} already present).`);
+if (import.meta.main) {
+  const { inserted, present } = await seedStarterProblems();
+  console.log(`Seeded ${inserted} new problems (${present} already present).`);
+}

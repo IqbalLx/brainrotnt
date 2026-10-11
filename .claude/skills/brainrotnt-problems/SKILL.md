@@ -6,9 +6,11 @@ version: 1.1.0
 
 # brainrotnt problems
 
-Version 1.1.0. brainrotnt is a local app for practising STEM problems and trivia while a coding agent works. The bank only accepts what the bridge can verify, so every item you write is checked before it is stored.
+Version 1.2.0. brainrotnt is a local app for practising STEM problems and trivia while a coding agent works. The bank only accepts what the bridge can verify, so every item you write is checked before it is stored.
 
 ## Before you write anything
+
+If the brainrotnt tools (`get_schema`, `submit_problems`, ...) are not available, brainrotnt is not running or not registered. Ask the user to start it with `brnt` (the installed app) and, if Claude Code has never been connected, to run `brnt setup claude`, then reconnect with `/mcp`. `brnt doctor` reports what is missing. Do not guess the tools' behaviour without them.
 
 1. Call `get_schema`. The live schema it returns is the truth; `references/schema.md` is a snapshot for reading offline and may be older.
 2. Call `get_coverage` to find thin topics and difficulties, and problems still missing hints or explanations.

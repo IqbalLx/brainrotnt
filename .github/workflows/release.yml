@@ -1,0 +1,82 @@
+name: Release
+
+# Push a tag like v0.3.0 to publish; install.sh downloads these files. Each platform is built on its own
+# kind of runner and smoke-tested there, so nothing is published that has not started on that OS and CPU.
+# The exception is linux-arm64, cross-compiled on x64 (arm64 Linux runners are not available everywhere);
+# switch it to ubuntu-24.04-arm with smoke: true where they are.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { platform: darwin-arm64, runner: macos-15, smoke: true }
+          - { platform: darwin-x64, runner: macos-15-intel, smoke: true }
+          - { platform: linux-x64, runner: ubuntu-24.04, smoke: true }
+          - { platform: linux-arm64, runner: ubuntu-24.04, smoke: false }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build:release -- --target ${{ matrix.platform }} --version ${{ github.ref_name }}
+
+      # Start the binary from an empty home and an unrelated directory: it must create its database, load
+      # the starter problems and serve the app, the API and MCP from one port.
+      - name: Smoke test
+        if: matrix.smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=$(mktemp -d)
+          tar -xzf "dist/release/brainrotnt-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz" -C "$dir"
+          test "$("$dir/brainrotnt" --version)" = "${{ github.ref_name }}"
+          export BRAINROTNT_HOME="$dir/home"
+          cd /
+          "$dir/brainrotnt" --port 18787 > "$dir/log" 2>&1 &
+          pid=$!
+          for _ in $(seq 1 60); do curl -fs http://127.0.0.1:18787/api/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:18787/api/health | grep -q '"app":"brainrotnt"'
+          curl -fs http://127.0.0.1:18787/ | grep -q 'id="root"'
+          curl -fs http://127.0.0.1:18787/api/coverage | grep -q '"total":'
+          curl -fs -X POST http://127.0.0.1:18787/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | grep -q submit_problems
+          kill "$pid"
+          cat "$dir/log"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/release/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: release
+        run: sha256sum brainrotnt-*.tar.gz > SHA256SUMS && cat SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" release/* --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes

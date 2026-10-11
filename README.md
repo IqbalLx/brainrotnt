@@ -6,11 +6,45 @@ The app watches your agent through [Luvus](https://github.com/RizRiyz/luvus) and
 
 > Status: early. You can see live agent state, answer multiple-choice, numeric and symbolic problems in math, stats and physics, get graded instantly with every attempt recorded, and flag a bad problem. Pick the Code subject for programming problems you solve in an in-browser editor.
 
-## Prerequisites
+## Install
+
+On macOS or Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/IqbalLx/brainrotnt/main/install.sh | sh
+```
+
+Then open a new terminal and run `brnt` (or `brainrotnt`). It prints a link and opens it in your browser when you press Enter:
+
+```
+  brainrotnt v0.3.0
+
+  ➜  Local:    http://localhost:8787
+  ➜  Network:  off · brnt --network to open it to your local network
+  ➜  MCP:      http://127.0.0.1:8787/mcp
+
+  agent    connected · Luvus · ~/.luvus/luvus.sock
+  sandbox  isolated
+  data     ~/.brainrotnt/data/brainrotnt.sqlite
+
+  Enter opens it in your browser · q quits
+```
+
+- **One program, one port.** The web app, the API, the live agent feed and the MCP server are all in a single binary. It uses port 8787, or the next free port if that is taken (`--port` picks one exactly). Running `brnt` while it is already running just shows the link again.
+- **Your data stays put.** Everything lives in `~/.brainrotnt`: the program in `bin/`, your problems and sessions in `data/`. On the first start it creates the database and loads the starter problems. It finds Luvus by itself (`$LUVUS_SOCKET_PATH`, else `~/.luvus/luvus.sock`) and waits for it if it is not running.
+- **Updating** is running the install command again, or `brnt update`. Only `bin/` is replaced. Before a new version changes the database, the app copies it to `data/backups/` (the last 3 are kept), so an update can never lose your progress.
+- **On your phone or another computer:** `brnt --network` also serves on your local network and prints a link with an access key, plus a QR code. Other devices need that link (the key changes on every start). MCP and the debug endpoints stay reachable from your own computer only, and code answers from other devices are refused unless you add `--allow-remote-code`, because they run on your machine.
+- `brnt doctor` checks the installation, Python, the sandbox, Luvus and Claude Code. `brnt setup claude` registers the MCP server with Claude Code for all projects and installs the problem-writing skill (the installer offers this the first time). `brnt uninstall` removes the app and its PATH line and keeps your data (`--purge` deletes that too).
+
+The installer verifies the download against the release checksums, installs into `~/.brainrotnt/bin` without `sudo`, and adds that folder to PATH in your shell's startup file (one marked block; set `BRAINROTNT_NO_MODIFY_PATH=1` to skip). `BRAINROTNT_VERSION=v0.3.0` installs a specific release. Python 3 is needed to check Python code answers and new problems.
+
+## Develop
+
+### Prerequisites
 
 - [Bun](https://bun.sh) 1.x (`curl -fsSL https://bun.sh/install | bash`). It runs the server, the package install and the dev scripts, so Node is not required.
 
-## Run it locally
+### Run it from source
 
 From the repo root:
 
@@ -24,7 +58,9 @@ bun run dev:web      # terminal 2: UI on http://localhost:5173
 
 Open http://localhost:5173, pick a subject and answer a problem. Without Luvus connected, the bridge uses a mock agent that cycles working, blocked, working, done and idle every 5 seconds, so you can see the banner react.
 
-Run `bun run db:migrate` again whenever the schema changes (`bun run db:generate` creates a new migration after you edit `apps/bridge/src/db/schema.ts`).
+Run `bun run db:migrate` again whenever the schema changes (`bun run db:generate` creates a new migration after you edit `apps/bridge/src/db/schema.ts`). It backs the database up to `backups/` next to it first, as the installed app does.
+
+To try the installed command from source, build the web app (`bun run --filter web build`) and run `BRAINROTNT_HOME=/tmp/brnt bun run brnt -- [options]`, with a home of its own so it stays away from a real installation.
 
 ## Connect it to a real Luvus agent
 
@@ -54,7 +90,8 @@ The state travels three hops: Luvus → the bridge's UHP client → the SSE stre
 | `PORT` | `8787` | bridge | API port (binds `127.0.0.1` only) |
 | `DB_PATH` | `./bridge.sqlite` | bridge | SQLite file, relative to `apps/bridge` |
 | `WEB_ORIGIN` | `http://localhost:5173` | bridge | Allowed CORS origin |
-| `UHP_SOCKET_PATH` | unset | bridge | Luvus socket; unset means the mock agent |
+| `UHP_SOCKET_PATH` | unset | bridge | Luvus socket; unset means the mock agent in development, and `~/.luvus/luvus.sock` in the installed app |
+| `BRAINROTNT_HOME` | `~/.brainrotnt` | installed app | where the program (`bin/`) and your data (`data/`) live |
 | `UHP_DEBUG` | unset | bridge | `1` prints every UHP frame, published state and SSE client to the bridge console |
 | `BRIDGE_URL` | `http://127.0.0.1:8787` | web | Where the Vite dev server proxies `/api` |
 
@@ -124,7 +161,7 @@ The bar on the Problem bank page sets the subjects a session draws from (toggle 
 
 ## Adding problems with Claude Code
 
-The bridge exposes an MCP endpoint, so Claude Code can grow the problem bank using the subscription you already have. Add it once:
+The bridge exposes an MCP endpoint, so Claude Code can grow the problem bank using the subscription you already have. With the installed app, run `brnt setup claude` once: it registers the server for all your projects and installs the skill below. From source, add it by hand:
 
 ```sh
 claude mcp add --transport http brainrotnt http://127.0.0.1:8787/mcp
@@ -247,10 +284,10 @@ cd apps/bridge && bunx tsc --noEmit   # typecheck the bridge
 cd apps/web && bun run build          # typecheck and build the UI
 ```
 
-## Build the bridge as one binary
+## Releases
 
-```sh
-cd apps/bridge && bun run build       # outputs apps/bridge/dist/bridge
-```
+`bun run build:release` builds the installable binary for this machine into `dist/release/brainrotnt-<version>-<platform>.tar.gz` (`-- --target linux-x64 --version v0.3.0` for another platform: `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`). It builds the web app, then generates an entry that embeds every file of `apps/web/dist`, the migrations in `apps/bridge/drizzle` and the skill, and compiles it with `bun build --compile` (about 46 MB to download, mostly the Bun runtime). Mac builds are ad-hoc signed so Apple Silicon runs them.
 
-The binary contains only the API. It does not serve the UI and does not run migrations, so you still need `bun run db:migrate` and the web dev server.
+Pushing a tag such as `v0.3.0` runs `.github/workflows/release.yml`. It builds each platform on a matching runner, starts each binary from an empty home and checks that it serves the app, the API and MCP, then publishes the archives with a `SHA256SUMS` file. `install.sh` downloads from there. `linux-arm64` is cross-compiled and not smoke-tested.
+
+The repository has to be public for the install command to work: `install.sh` is fetched from raw.githubusercontent.com, and the releases are downloaded without signing in.

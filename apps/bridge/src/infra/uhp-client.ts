@@ -162,6 +162,7 @@ class LuvusUhpClient extends StateHub implements UhpClient {
   private subscription: { end(): void } | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
+  private lastLogged: string | null = null;
 
   constructor(private readonly socketPath: string) {
     super();
@@ -188,7 +189,9 @@ class LuvusUhpClient extends StateHub implements UhpClient {
       await this.subscribe();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[uhp-client] connect failed: ${message}`);
+      // Retried every 2 s while Luvus is not running: say it once, not every time.
+      if (message !== this.lastLogged) console.warn(`[uhp-client] connect failed: ${message}`);
+      this.lastLogged = message;
       this.stats.connection = "disconnected";
       this.stats.lastError = message;
       this.scheduleReconnect();
@@ -249,6 +252,7 @@ class LuvusUhpClient extends StateHub implements UhpClient {
                 this.stats.connection = "subscribed";
                 this.stats.subscribedAt = new Date().toISOString();
                 this.stats.lastError = null;
+                this.lastLogged = null;
                 this.panes.clear();
                 this.eventPanes.clear();
                 resolve();
@@ -412,8 +416,15 @@ class MockUhpClient extends StateHub implements UhpClient {
   }
 }
 
-export function createUhpClient(): UhpClient {
-  const socketPath = process.env.UHP_SOCKET_PATH ?? process.env.LUVUS_SOCKET_PATH;
+export interface UhpClientOptions {
+  /** Development: with no socket configured, cycle through fake states so the UI has something to show. */
+  mockWhenUnset?: boolean;
+  /** The installed app: with no socket configured, use this one, waiting for Luvus until it appears. */
+  defaultSocketPath?: string;
+}
+
+export function createUhpClient({ mockWhenUnset = true, defaultSocketPath }: UhpClientOptions = {}): UhpClient {
+  const socketPath = process.env.UHP_SOCKET_PATH || process.env.LUVUS_SOCKET_PATH || (mockWhenUnset ? undefined : defaultSocketPath);
   if (socketPath) return new LuvusUhpClient(socketPath);
 
   console.warn(
