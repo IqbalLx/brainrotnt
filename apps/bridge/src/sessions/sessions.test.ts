@@ -11,11 +11,13 @@ import { revealHintRoute } from "../features/reveal-hint/route";
 import { listSessionsRoute } from "../features/list-sessions/route";
 import { skipSessionQuestionRoute } from "../features/skip-session-question/route";
 import { startSessionRoute } from "../features/start-session/route";
-import { insertProblem, json, postJson, resetDb } from "../test-support";
+import { trySessionCodeRoute } from "../features/try-session-code/route";
+import { problemSpec, storedAnswer } from "../content/problem-spec";
+import { codeSpec, insertProblem, json, postJson, resetDb } from "../test-support";
 import { creditFor } from "./session";
 
 const app = new Hono();
-for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
+for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute, trySessionCodeRoute]) {
   app.route("/", route);
 }
 
@@ -298,6 +300,39 @@ describe("hints", () => {
     expect((await reveal(view.id, 1)).status).toBe(409);
     await app.request(`/${view.id}/end`, { method: "POST" });
     expect((await reveal(view.id, 0)).status).toBe(409);
+  });
+});
+
+describe("trying code before submitting", () => {
+  const codeProblem = (difficulty: number) =>
+    insertProblem({ subject: "code", type: "code", difficulty, answer: storedAnswer(problemSpec.parse(codeSpec())) as never });
+  const tryCode = (id: string, position: number, code: string) => app.request(`/${id}/try`, postJson({ position, answer: { language: "python", code } }));
+  const sumAll = "def solve(numbers):\n    return sum(numbers)\n";
+
+  test("runs the disclosed tests without recording anything or moving on", async () => {
+    await codeProblem(3);
+    const view = await started({ subjects: ["code"] });
+    const res = await tryCode(view.id, 0, sumAll);
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body).toMatchObject({ status: "ran", moreTests: 3 });
+    expect(body.results.map((r: { passed: boolean }) => r.passed)).toEqual([false, true]);
+    expect(await db.select().from(attempts)).toHaveLength(0);
+    expect((await json(await app.request("/current"))).position).toBe(0);
+  });
+
+  test("only on the current code question of an open session", async () => {
+    await codeProblem(1);
+    await codeProblem(1);
+    const view = await started({ subjects: ["code"], size: 2 });
+    expect((await tryCode(view.id, 1, sumAll)).status).toBe(409);
+    expect((await tryCode(view.id, 0, "x = 1\n")).status).toBe(422);
+    await app.request(`/${view.id}/end`, { method: "POST" });
+    expect((await tryCode(view.id, 0, sumAll)).status).toBe(409);
+
+    await insertProblem({ subject: "math" });
+    const maths = await started();
+    expect((await tryCode(maths.id, 0, sumAll)).status).toBe(422);
   });
 });
 

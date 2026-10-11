@@ -43,7 +43,7 @@ const hostnameOf = (value: string) => {
  * - Any other device needs the access key: from the link once (`?key=`), which sets a cookie and
  *   redirects to drop the key from the address bar, then from the cookie.
  * - MCP (which writes problems) and the debug endpoints stay reachable from this computer only.
- * - Code answers, which run on this machine, are refused from other devices unless allowed.
+ * - Code answers and trial runs, which run on this machine, are refused from other devices unless allowed.
  */
 export function networkAccess({ key, hosts, allowRemoteCode, peerAddress = (c) => getConnInfo(c).remote.address }: NetworkAccess): MiddlewareHandler {
   const allowed = new Set([...LOCAL_HOSTS, ...hosts]);
@@ -72,7 +72,7 @@ export function networkAccess({ key, hosts, allowRemoteCode, peerAddress = (c) =
         : c.html(LOCKED_PAGE, 401);
     }
 
-    if (!allowRemoteCode && c.req.method === "POST" && /^\/api\/(attempts|sessions\/[^/]+\/answer)$/.test(url.pathname)) {
+    if (!allowRemoteCode && c.req.method === "POST" && /^\/api\/(attempts|sessions\/[^/]+\/(answer|try))$/.test(url.pathname)) {
       const body = await c.req.json().catch(() => null);
       const answer = (body as { answer?: unknown } | null)?.answer;
       if (answer && typeof answer === "object" && "code" in answer) {

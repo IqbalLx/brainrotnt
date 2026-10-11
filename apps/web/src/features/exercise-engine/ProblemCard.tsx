@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
 import { useCalculatorState } from "../calculator/calculatorState";
 import { CodeAnswer } from "../code-editor/CodeAnswer";
-import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
+import type { CodeLanguage, CodeSubmission, TrialOutcome } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
 import { SUBJECT_LABEL } from "../session/format";
 import { formatElapsed } from "../run-timer/timerState";
@@ -25,6 +25,8 @@ interface ProblemCardProps {
   flagged: boolean;
   calculatorCeiling: CalculatorTier;
   onSubmit: (answer: string | number | CodeSubmission, toolsUsed: string[]) => void;
+  /** Runs code against the tests shown, without submitting. Only code problems use it. */
+  onTry?: (submission: CodeSubmission) => Promise<TrialOutcome>;
   onFlag: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -63,6 +65,7 @@ function ActiveProblem({
   flagged,
   calculatorCeiling,
   onSubmit,
+  onTry,
   onFlag,
   onNext,
   onSkip,
@@ -83,6 +86,9 @@ function ActiveProblem({
   );
   const starterOf = (lang: CodeLanguage) => codeView?.languages.find((l) => l.language === lang)?.starter ?? "";
   const draft = drafts[language] ?? "";
+  // The last trial run, for the language it ran in; a run that is still going blocks another.
+  const [trial, setTrial] = useState<(TrialOutcome & { language: CodeLanguage }) | null>(null);
+  const [trying, setTrying] = useState(false);
   const [usedCalculator, setUsedCalculator] = useState(false);
   const calculatorState = useCalculatorState();
   const [usedDrawing, setUsedDrawing] = useState(false);
@@ -92,6 +98,17 @@ function ActiveProblem({
   const locked = phase === "submitting" || phase === "result";
   const canSubmit =
     !locked && (problem.type === "mcq" ? choice !== null : problem.type === "code" ? draft.trim() !== "" : text.trim() !== "");
+
+  const canTry = canSubmit && !trying && onTry !== undefined;
+
+  async function handleTry() {
+    if (!canTry || !onTry) return;
+    setTrying(true);
+    const ran = language;
+    const outcome = await onTry({ language: ran, code: draft });
+    setTrial({ ...outcome, language: ran });
+    setTrying(false);
+  }
 
   function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
@@ -170,6 +187,8 @@ function ActiveProblem({
                 onCode={(code) => setDrafts((current) => ({ ...current, [language]: code }))}
                 onReset={() => setDrafts((current) => ({ ...current, [language]: starterOf(language) }))}
                 onSubmit={() => canSubmit && handleSubmit()}
+                onTry={onTry ? () => void handleTry() : undefined}
+                trial={trial?.language === language ? trial : null}
                 result={result}
                 locked={locked}
               />
@@ -190,7 +209,12 @@ function ActiveProblem({
                 </Button>
               ) : (
                 <>
-                  <Button type="submit" disabled={!canSubmit} className="h-11 px-6">
+                  {codeView && onTry && (
+                    <Button type="button" variant="outline" disabled={!canTry} onClick={() => void handleTry()} className="h-11 px-5">
+                      {trying ? "Running" : "Run tests"}
+                    </Button>
+                  )}
+                  <Button type="submit" disabled={!canSubmit || trying} className="h-11 px-6">
                     {phase === "submitting" ? (problem.type === "code" ? "Running tests" : "Checking") : "Submit"}
                   </Button>
                   <Button type="button" variant="ghost" onClick={onSkip} disabled={phase === "submitting"}>

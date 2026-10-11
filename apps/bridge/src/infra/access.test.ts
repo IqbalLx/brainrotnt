@@ -14,6 +14,7 @@ function app(allowRemoteCode = false) {
   app.post("/mcp", (c) => c.json({ mcp: true }));
   app.get("/api/debug/agent-state", (c) => c.json({ debug: true }));
   app.post("/api/sessions/:id/answer", async (c) => c.json({ graded: await c.req.json() }));
+  app.post("/api/sessions/:id/try", async (c) => c.json({ tried: await c.req.json() }));
   return app;
 }
 const remote = { "x-test-peer": "192.168.1.50" };
@@ -67,5 +68,16 @@ describe("networkAccess", () => {
     expect((await post(true, { language: "python", code: "def solve(): pass" })).status).toBe(200);
     // The route can still read the body the guard already parsed.
     expect(await (await post(false, "42")).json()).toEqual({ graded: { position: 0, answer: "42" } });
+  });
+
+  test("trial runs of code from another device are refused unless allowed", async () => {
+    const tryCode = (allow: boolean) =>
+      app(allow).request(`${LAN}/api/sessions/s1/try`, {
+        method: "POST",
+        headers: { ...cookie, "content-type": "application/json" },
+        body: JSON.stringify({ position: 0, answer: { language: "python", code: "def solve(): pass" } }),
+      });
+    expect((await tryCode(false)).status).toBe(403);
+    expect((await tryCode(true)).status).toBe(200);
   });
 });

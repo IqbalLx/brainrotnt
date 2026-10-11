@@ -1,5 +1,5 @@
 import type { CodeAnswer } from "../db/answer";
-import { runCalls, valuesMatch } from "../infra/code-runner";
+import { runCalls, valuesMatch, type CallOutcome } from "../infra/code-runner";
 import type { Language, SandboxFailure } from "../infra/sandbox-runner";
 
 export interface TestFailure {
@@ -18,6 +18,31 @@ export type TestReport =
 
 const clip = (text: string, limit = 120) => (text.length > limit ? `${text.slice(0, limit)}…` : text);
 
+export interface TestResult {
+  args: unknown[];
+  expected: unknown;
+  passed: boolean;
+  /** What the code returned, or the error it raised, already formatted for display. */
+  got: string;
+}
+
+export type TrialReport = { status: "ran"; results: TestResult[] } | { status: "broken"; message: string } | { status: "failed"; reason: SandboxFailure; message: string };
+
+const gotText = (call: CallOutcome) => (call.ok ? clip(JSON.stringify(call.value)) : `raised ${call.error}`);
+
+// Runs the code against the given tests and reports each one. Only for tests the student may see.
+export async function tryTests(language: Language, code: string, entry: string, tests: CodeAnswer["tests"]): Promise<TrialReport> {
+  const outcome = await runCalls(language, code, entry, tests.map((t) => t.args));
+  if (outcome.status !== "ran") return outcome;
+  return {
+    status: "ran",
+    results: tests.map((test, index) => {
+      const call = outcome.calls[index];
+      return { args: test.args, expected: test.expected, passed: call.ok && valuesMatch(test.expected, call.value), got: gotText(call) };
+    }),
+  };
+}
+
 export async function runTests(language: Language, code: string, answer: Pick<CodeAnswer, "entry" | "tests">): Promise<TestReport> {
   const outcome = await runCalls(language, code, answer.entry, answer.tests.map((t) => t.args));
   if (outcome.status !== "ran") return outcome;
@@ -30,13 +55,7 @@ export async function runTests(language: Language, code: string, answer: Pick<Co
       passed++;
       return;
     }
-    firstFailure ??= {
-      index,
-      hidden: test.hidden,
-      args: test.args,
-      expected: test.expected,
-      got: call.ok ? clip(JSON.stringify(call.value)) : `raised ${call.error}`,
-    };
+    firstFailure ??= { index, hidden: test.hidden, args: test.args, expected: test.expected, got: gotText(call) };
   });
   return { status: "ran", passed, total: answer.tests.length, firstFailure };
 }

@@ -1,6 +1,7 @@
 import { checkEquivalent } from "@brainrotnt/math-engine";
-import { describeTestFailure, runTests } from "../content/run-tests";
-import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
+import { disclosedTests, withDisclosure } from "../content/disclosure";
+import { describeTestFailure, runTests, tryTests, type TestResult } from "../content/run-tests";
+import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer, type CodeAnswer } from "../db/answer";
 
 export type GradeResult =
   | { status: "graded"; correct: boolean; expected: string; detail?: string }
@@ -93,18 +94,28 @@ export function grade(type: string, stored: unknown, given: unknown): GradeResul
 export type CodeSubmission = { language: (typeof CODE_LANGUAGES)[number]; code: string };
 
 // Code is run, so unlike the other types it grades asynchronously (and never inside the HTTP handler's sync path).
-export async function gradeCode(stored: unknown, given: unknown): Promise<GradeResult> {
-  const answer = codeAnswer.parse(stored);
+// Checks a code submission's shape and that the problem offers its language.
+function readSubmission(answer: CodeAnswer, given: unknown): { ok: true; submission: CodeSubmission } | { ok: false; message: string } {
   const submission = given as Partial<CodeSubmission> | null;
   if (typeof submission !== "object" || submission === null || typeof submission.code !== "string" || !CODE_LANGUAGES.includes(submission.language as never)) {
-    return { status: "invalid", message: "Submit your code and pick a language." };
+    return { ok: false, message: "Submit your code and pick a language." };
   }
   const language = submission.language as CodeSubmission["language"];
-  const offered = answer.languages[language];
-  if (!offered) return { status: "invalid", message: `This problem is not available in ${language}.` };
-  if (submission.code.trim() === "") return { status: "invalid", message: "Write some code first." };
+  if (!answer.languages[language]) return { ok: false, message: `This problem is not available in ${language}.` };
+  if (submission.code.trim() === "") return { ok: false, message: "Write some code first." };
+  return { ok: true, submission: { language, code: submission.code } };
+}
 
-  const report = await runTests(language, submission.code, answer);
+// A failing test's expected value is shown only when the problem's difficulty discloses that test.
+export async function gradeCode(stored: unknown, given: unknown, difficulty: number): Promise<GradeResult> {
+  const parsed = codeAnswer.parse(stored);
+  const answer = { ...parsed, tests: withDisclosure(parsed.tests, difficulty) };
+  const read = readSubmission(answer, given);
+  if (!read.ok) return { status: "invalid", message: read.message };
+  const { language, code } = read.submission;
+  const offered = answer.languages[language]!;
+
+  const report = await runTests(language, code, answer);
   if (report.status === "broken") return { status: "invalid", message: report.message };
   if (report.status === "failed") {
     if (report.reason === "timeout") {
@@ -122,6 +133,30 @@ export async function gradeCode(stored: unknown, given: unknown): Promise<GradeR
   return { status: "graded", correct, expected: offered.solution, detail };
 }
 
-export function gradeAttempt(type: string, stored: unknown, given: unknown): Promise<GradeResult> {
-  return type === "code" ? gradeCode(stored, given) : Promise.resolve(grade(type, stored, given));
+export function gradeAttempt(type: string, stored: unknown, given: unknown, difficulty: number): Promise<GradeResult> {
+  return type === "code" ? gradeCode(stored, given, difficulty) : Promise.resolve(grade(type, stored, given));
+}
+
+export type TrialResult =
+  | { status: "ran"; results: TestResult[]; moreTests: number }
+  | { status: "timeout" | "output_too_large"; message: string }
+  | { status: "invalid"; message: string };
+
+// Runs code against only the tests this difficulty discloses, before submitting. Nothing is recorded,
+// and the undisclosed tests never run here, so a trial reveals nothing a submit would not.
+export async function tryCode(stored: unknown, given: unknown, difficulty: number): Promise<TrialResult> {
+  const answer = codeAnswer.parse(stored);
+  const read = readSubmission(answer, given);
+  if (!read.ok) return { status: "invalid", message: read.message };
+  const shown = disclosedTests(answer.tests, difficulty);
+  const tests = answer.tests.filter((_, index) => shown[index]);
+
+  const report = await tryTests(read.submission.language, read.submission.code, answer.entry, tests);
+  if (report.status === "broken") return { status: "invalid", message: report.message };
+  if (report.status === "failed") {
+    if (report.reason === "timeout") return { status: "timeout", message: "Time limit exceeded: the code took too long, possibly an infinite loop." };
+    if (report.reason === "output_too_large") return { status: "output_too_large", message: "The code printed far too much output." };
+    return { status: "invalid", message: report.reason === "sandbox_unavailable" ? report.message : `The code could not be run: ${report.message}` };
+  }
+  return { status: "ran", results: report.results, moreTests: answer.tests.length - tests.length };
 }

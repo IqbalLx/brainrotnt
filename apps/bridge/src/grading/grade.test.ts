@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { problemSpec, storedAnswer } from "../content/problem-spec";
 import { codeSpec } from "../test-support";
-import { grade, gradeAttempt, parseNumericInput } from "./grade";
+import { grade, gradeAttempt, parseNumericInput, tryCode } from "./grade";
 
 const numeric = (value: number, tolerance = 0.01, unit?: string) => ({ value, tolerance, unit });
 const correct = (r: ReturnType<typeof grade>) => r.status === "graded" && r.correct;
@@ -123,7 +123,8 @@ describe("symbolic grading", () => {
 
 describe("code grading", () => {
   const stored = storedAnswer(problemSpec.parse(codeSpec()));
-  const submit = (language: string, code: string) => gradeAttempt("code", stored, { language, code });
+  // Difficulty 3 discloses the two tests the fixture's author made visible, and keeps the other three back.
+  const submit = (language: string, code: string, difficulty = 3) => gradeAttempt("code", stored, { language, code }, difficulty);
   const py = (body: string) => `def solve(numbers):\n${body.replace(/^/gm, "    ")}\n`;
 
   test("a correct solution passes all tests in either language", async () => {
@@ -148,6 +149,11 @@ describe("code grading", () => {
     expect(result.status === "graded" && result.detail).toBe("Passed 4 of 5 tests. First failure: solve([7,9]) returned 1");
   });
 
+  test("on an easy problem every test is disclosed, so a failure shows its expected value", async () => {
+    const result = await submit("python", py("return sum(n for n in numbers if n % 2 == 0) + (1 if numbers == [7, 9] else 0)"), 1);
+    expect(result.status === "graded" && result.detail).toBe("Passed 4 of 5 tests. First failure: solve([7,9]) returned 1, expected 0");
+  });
+
   test("an exception is described rather than hidden", async () => {
     const result = await submit("python", py("return numbers[10]"));
     expect(result.status === "graded" && result.detail).toContain("raised IndexError");
@@ -168,16 +174,51 @@ describe("code grading", () => {
     expect(await submit("python", "x = 1\n")).toEqual({ status: "invalid", message: "Define a function named solve." });
     expect(await submit("python", "   ")).toEqual({ status: "invalid", message: "Write some code first." });
     expect(await submit("ruby", "puts 1")).toEqual({ status: "invalid", message: "Submit your code and pick a language." });
-    expect(await gradeAttempt("code", stored, "just text")).toEqual({ status: "invalid", message: "Submit your code and pick a language." });
+    expect(await gradeAttempt("code", stored, "just text", 3)).toEqual({ status: "invalid", message: "Submit your code and pick a language." });
   });
 
   test("a language the problem does not offer is invalid", async () => {
     const pythonOnly = storedAnswer(problemSpec.parse({ ...codeSpec(), languages: { python: (codeSpec() as any).languages.python } }));
-    expect(await gradeAttempt("code", pythonOnly, { language: "javascript", code: "function solve() {}" })).toEqual({
+    expect(await gradeAttempt("code", pythonOnly, { language: "javascript", code: "function solve() {}" }, 3)).toEqual({
       status: "invalid",
       message: "This problem is not available in javascript.",
     });
   });
+});
+
+describe("trying code before submitting", () => {
+  const stored = storedAnswer(problemSpec.parse(codeSpec()));
+  const attempt = (code: string, difficulty: number, language = "python") => tryCode(stored, { language, code }, difficulty);
+  const sumAll = "def solve(numbers):\n    return sum(numbers)\n";
+
+  test("runs only the disclosed tests and reports each one", async () => {
+    expect(await attempt(sumAll, 3)).toEqual({
+      status: "ran",
+      moreTests: 3,
+      results: [
+        { args: [[1, 2, 3, 4]], expected: 6, passed: false, got: "10" },
+        { args: [[]], expected: 0, passed: true, got: "0" },
+      ],
+    });
+  });
+
+  test("the difficulty decides how many tests run", async () => {
+    const easy = await attempt(sumAll, 1);
+    expect(easy.status === "ran" && [easy.results.length, easy.moreTests]).toEqual([5, 0]);
+    const hard = await attempt(sumAll, 5);
+    expect(hard.status === "ran" && [hard.results.length, hard.moreTests]).toEqual([1, 4]);
+  });
+
+  test("errors are reported per test, and unrunnable code is invalid", async () => {
+    const raised = await attempt("function solve(numbers) { return numbers[0].x; }", 3, "javascript");
+    expect(raised.status === "ran" && raised.results[1]).toMatchObject({ passed: false, got: expect.stringContaining("raised TypeError") });
+    expect(await attempt("x = 1\n", 3)).toEqual({ status: "invalid", message: "Define a function named solve." });
+    expect(await attempt("  ", 3)).toEqual({ status: "invalid", message: "Write some code first." });
+  });
+
+  test("an infinite loop times out", async () => {
+    expect(await attempt("def solve(numbers):\n    while True: pass\n", 3)).toMatchObject({ status: "timeout" });
+  }, 15_000);
 });
 
 describe("other types", () => {

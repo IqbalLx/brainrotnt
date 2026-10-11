@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentState } from "../agent-state/useAgentState";
-import type { CodeSubmission } from "../code-editor/languages";
+import type { CodeSubmission, TrialOutcome } from "../code-editor/languages";
 import type { AttemptResult, Problem } from "../exercise-engine/types";
 import type { Settings } from "../settings/settings";
 
@@ -188,6 +188,24 @@ export function useSession(agentState: AgentState) {
     [view],
   );
 
+  // Runs code against the disclosed tests of the current question. Nothing is recorded and the
+  // question stays open, so the result is returned to the card rather than kept here.
+  const tryCode = useCallback(
+    async (submission: CodeSubmission): Promise<TrialOutcome> => {
+      if (!view || view.position === null) return { status: "error", message: "There is no question to run." };
+      try {
+        const res = await post(`/api/sessions/${view.id}/try`, { position: view.position, answer: submission });
+        const body = await res.json();
+        if (res.ok && body.status === "ran") return body as TrialOutcome;
+        if (typeof body.message === "string") return { status: "error", message: body.message };
+        return { status: "error", message: `bridge returned ${res.status}` };
+      } catch {
+        return { status: "error", message: "Could not reach the bridge to run the tests." };
+      }
+    },
+    [view],
+  );
+
   const next = useCallback(async () => {
     if (pending.current) await showQuestion(pending.current);
     pending.current = null;
@@ -252,5 +270,5 @@ export function useSession(agentState: AgentState) {
   // until "Next", so a Done reminder can still offer to end it.
   const open = view !== null && view.endedAt === null && !(phase === "result" && pending.current?.endedAt);
 
-  return { view, phase, result, message, flagged, score, open, revealing, start, submit, next, skip, end, flag, revealHint };
+  return { view, phase, result, message, flagged, score, open, revealing, start, submit, tryCode, next, skip, end, flag, revealHint };
 }

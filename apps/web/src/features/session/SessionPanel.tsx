@@ -117,6 +117,7 @@ export function SessionPanel({ session, settings, agentWorking, onStart }: Sessi
         flagged={flagged}
         calculatorCeiling={settings.calculator}
         onSubmit={session.submit}
+        onTry={session.tryCode}
         onFlag={session.flag}
         onNext={session.next}
         onSkip={session.skip}

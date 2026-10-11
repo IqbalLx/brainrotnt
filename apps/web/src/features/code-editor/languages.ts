@@ -5,8 +5,21 @@ export const LANGUAGE_LABEL: Record<CodeLanguage, string> = { python: "Python", 
 export interface CodeView {
   entry: string;
   languages: { language: CodeLanguage; starter: string }[];
+  /** The tests that can be run before submitting; how many are shown depends on the difficulty. */
   examples: { args: unknown[]; expected: unknown }[];
+  /** How many more tests run only on submit. */
+  moreTests: number;
 }
+
+/** One disclosed test after a trial run. `got` is what the code returned, or the error it raised. */
+export interface TestRun {
+  args: unknown[];
+  expected: unknown;
+  passed: boolean;
+  got: string;
+}
+
+export type TrialOutcome = { status: "ran"; results: TestRun[]; moreTests: number } | { status: "error"; message: string };
 
 export interface CodeSubmission {
   language: CodeLanguage;

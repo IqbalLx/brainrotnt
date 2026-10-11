@@ -15,6 +15,7 @@ import { getSessionScoreRoute } from "./features/get-session-score/route";
 import { skipSessionQuestionRoute } from "./features/skip-session-question/route";
 import { startSessionRoute } from "./features/start-session/route";
 import { revealHintRoute } from "./features/reveal-hint/route";
+import { trySessionCodeRoute } from "./features/try-session-code/route";
 import { listSessionsRoute } from "./features/list-sessions/route";
 import { getCoverageRoute } from "./features/get-coverage/route";
 import { listFlaggedRoute } from "./features/list-flagged/route";
@@ -45,7 +46,7 @@ export function createApp({ uhpClient, sandbox, version, access, api = [], webAs
   app.route("/api/flags", flagProblemRoute);
   app.route("/api/coverage", getCoverageRoute);
   app.route("/api/flagged", listFlaggedRoute);
-  for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
+  for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute, trySessionCodeRoute]) {
     app.route("/api/sessions", route);
   }
   app.route("/mcp", mcpRoute);
