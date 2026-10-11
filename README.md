@@ -86,6 +86,12 @@ Grading happens on the bridge, so the answer key never reaches the browser. Ever
 
 The bar above the problem sets the subject, a difficulty range (click the dots: a dot outside the range extends it, an end dot shrinks it by one level) and a calculator tier (none, basic, scientific or stats). They are remembered in this browser's local storage. The calculator tier is a ceiling: each problem declares the tier it allows, and the tool chip on the card shows the lower of the two. Choosing None acts as strict mode.
 
+## Sandbox for generated code
+
+Problems added through the content pipeline carry Python code (reference solutions and generators) written by an AI agent, possibly from injected source material, so it is never trusted. `apps/bridge/src/infra/sandbox-runner.ts` runs it in a subprocess with a 5 second limit, 512 MB of memory, a 1 MB file-size limit, 64 open files, a scrubbed environment (nothing from yours leaks in), an empty temp directory, capped output, and **no network** (a Linux network namespace via `unshare -rn`).
+
+Where that isolation is unavailable (macOS, Windows, or a Linux without user namespaces) the runner fails closed and the bridge says so at startup and in `GET /api/health`. Set `BRAINROTNT_ALLOW_UNSANDBOXED=1` to run with the limits but without network isolation, which means trusting whatever code you submit. It needs `python3` on your PATH.
+
 ## Calculator
 
 Problems that allow a calculator show a panel under the card. The tier is enforced in code, not hidden in the UI, in two layers: the maths library instance has its escape hatches (`import`, `evaluate`, `parse`, `simplify`, `derivative`, ...) replaced with errors and its factorial and combinatorics capped, and every expression's syntax tree is checked against the tier's whitelist before anything is evaluated.

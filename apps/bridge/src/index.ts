@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { getSandboxMode } from "./infra/sandbox-runner";
 import { createUhpClient } from "./infra/uhp-client";
 import { createAgentStateStreamRoute } from "./features/agent-state-stream/route";
 import { flagProblemRoute } from "./features/flag-problem/route";
@@ -10,6 +11,15 @@ import { submitAttemptRoute } from "./features/submit-attempt/route";
 const app = new Hono();
 app.use("/api/*", cors({ origin: process.env.WEB_ORIGIN ?? "http://localhost:5173" }));
 
+const sandbox = await getSandboxMode();
+if (sandbox !== "strict") {
+  console.warn(
+    sandbox === "unavailable"
+      ? "[sandbox] network isolation is unavailable: reference solutions will not run. Set BRAINROTNT_ALLOW_UNSANDBOXED=1 to run them without it."
+      : "[sandbox] running reference solutions WITHOUT network isolation (BRAINROTNT_ALLOW_UNSANDBOXED=1).",
+  );
+}
+
 const uhpClient = createUhpClient();
 await uhpClient.start();
 
@@ -19,7 +29,7 @@ app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
 app.route("/api/session-summary", sessionSummaryRoute);
 
-app.get("/api/health", (c) => c.json({ ok: true }));
+app.get("/api/health", (c) => c.json({ ok: true, sandbox }));
 
 const port = Number(process.env.PORT ?? 8787);
 console.log(`bridge listening on http://127.0.0.1:${port}`);
