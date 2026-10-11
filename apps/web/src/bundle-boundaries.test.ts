@@ -28,4 +28,18 @@ describe("bundle boundaries", () => {
     );
     expect(importers).toEqual([]);
   });
+
+  test("CodeMirror is only imported by the lazily loaded editor", () => {
+    const offenders = files.filter(
+      (file) => /from\s+["']@(codemirror|lezer)\//.test(readFileSync(join(SRC, file), "utf8")) && !file.endsWith("code-editor/CodeEditor.tsx"),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  test("the code editor is only ever loaded lazily", () => {
+    const importers = files.filter(
+      (file) => /from\s+["'][^"']*\/CodeEditor["']/.test(readFileSync(join(SRC, file), "utf8")),
+    );
+    expect(importers).toEqual([]);
+  });
 });

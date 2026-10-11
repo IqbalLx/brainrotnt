@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { effectiveTier, type CalculatorTier } from "../settings/settings";
+import { CodeAnswer } from "../code-editor/CodeAnswer";
+import type { CodeLanguage, CodeSubmission } from "../code-editor/languages";
 import { DrawingBoardPanel } from "../drawing-board/DrawingBoardPanel";
 import { AnswerInput } from "./AnswerInput";
 import type { AttemptResult, Phase, Problem } from "./useExercise";
@@ -18,7 +20,7 @@ interface ProblemCardProps {
   message: string | null;
   flagged: boolean;
   calculatorCeiling: CalculatorTier;
-  onSubmit: (answer: string | number, toolsUsed: string[]) => void;
+  onSubmit: (answer: string | number | CodeSubmission, toolsUsed: string[]) => void;
   onFlag: () => void;
   onNext: () => void;
 }
@@ -92,17 +94,27 @@ function ActiveProblem({
 }: ProblemCardProps & { problem: Problem }) {
   const [choice, setChoice] = useState<number | null>(null);
   const [text, setText] = useState("");
+  const codeView = problem.type === "code" ? problem.code : null;
+  const [language, setLanguage] = useState<CodeLanguage>(codeView?.languages[0]?.language ?? "python");
+  // Each language keeps its own draft, so switching back and forth loses nothing.
+  const [drafts, setDrafts] = useState<Partial<Record<CodeLanguage, string>>>(() =>
+    Object.fromEntries((codeView?.languages ?? []).map((l) => [l.language, l.starter])),
+  );
+  const starterOf = (lang: CodeLanguage) => codeView?.languages.find((l) => l.language === lang)?.starter ?? "";
+  const draft = drafts[language] ?? "";
   const [usedCalculator, setUsedCalculator] = useState(false);
   const [usedDrawing, setUsedDrawing] = useState(false);
   const tier = effectiveTier(problem.tools.calculator, calculatorCeiling);
 
   const locked = phase === "submitting" || phase === "result";
-  const canSubmit = !locked && (problem.type === "mcq" ? choice !== null : text.trim() !== "");
+  const canSubmit =
+    !locked && (problem.type === "mcq" ? choice !== null : problem.type === "code" ? draft.trim() !== "" : text.trim() !== "");
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  function handleSubmit(event?: FormEvent) {
+    event?.preventDefault();
     if (!canSubmit) return;
-    onSubmit(problem.type === "mcq" ? (choice as number) : text.trim(), [
+    const answer = problem.type === "mcq" ? (choice as number) : problem.type === "code" ? { language, code: draft } : text.trim();
+    onSubmit(answer, [
       ...(usedCalculator ? ["calculator"] : []),
       ...(usedDrawing ? ["draw"] : []),
     ]);
@@ -125,15 +137,29 @@ function ActiveProblem({
         <p className="text-body text-ink">{problem.statement}</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <AnswerInput
-            problem={problem}
-            text={text}
-            choice={choice}
-            onText={setText}
-            onChoice={setChoice}
-            result={result}
-            locked={locked}
-          />
+          {codeView ? (
+            <CodeAnswer
+              view={codeView}
+              language={language}
+              code={draft}
+              onLanguage={setLanguage}
+              onCode={(code) => setDrafts((current) => ({ ...current, [language]: code }))}
+              onReset={() => setDrafts((current) => ({ ...current, [language]: starterOf(language) }))}
+              onSubmit={() => canSubmit && handleSubmit()}
+              result={result}
+              locked={locked}
+            />
+          ) : (
+            <AnswerInput
+              problem={problem}
+              text={text}
+              choice={choice}
+              onText={setText}
+              onChoice={setChoice}
+              result={result}
+              locked={locked}
+            />
+          )}
 
           {message && (
             <p role="alert" className="text-body-sm text-danger">
@@ -149,7 +175,7 @@ function ActiveProblem({
             ) : (
               <>
                 <Button type="submit" disabled={!canSubmit}>
-                  {phase === "submitting" ? "Checking" : "Submit"}
+                  {phase === "submitting" ? (problem.type === "code" ? "Running tests" : "Checking") : "Submit"}
                 </Button>
                 <Button type="button" variant="ghost" onClick={onNext} disabled={phase === "submitting"}>
                   Skip
