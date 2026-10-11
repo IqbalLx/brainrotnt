@@ -12,6 +12,8 @@ export const problems = sqliteTable("problems", {
   answer: text("answer", { mode: "json" }).notNull(),
   // Up to three hints, revealed one at a time; null when the problem has none yet.
   hints: text("hints", { mode: "json" }).$type<string[]>(),
+  // Markdown with KaTeX; only ever sent on the score screen, after the session.
+  explanation: text("explanation"),
   verificationStatus: text("verification_status", {
     enum: ["verified", "unverified", "flagged", "retired"],
   })
