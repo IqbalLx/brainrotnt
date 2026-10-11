@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProblemCard } from "../exercise-engine/ProblemCard";
 import type { CalculatorTier } from "../settings/settings";
-import { ScoreScreen } from "./ScoreScreen";
+import { formatPoints } from "./format";
+import { hrefFor } from "../shell/useRoute";
 import { SessionProgress } from "./SessionProgress";
 import type { useSession } from "./useSession";
 
@@ -68,7 +69,23 @@ export function SessionPanel({ session, calculatorCeiling, sessionSize, agentWor
   }
 
   if (phase === "ended" && score) {
-    return <ScoreScreen score={score} onStartAnother={onStart} agentWorking={agentWorking} />;
+    return (
+      <Card aria-label="Session score">
+        <CardHeader>
+          <CardTitle>Session complete</CardTitle>
+          <CardDescription>
+            {formatPoints(score.score)} of {score.maxScore} points, {score.correct} correct.
+            {agentWorking && " Your agent is still working."}
+          </CardDescription>
+        </CardHeader>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline">
+            <a href={hrefFor({ page: "review", sessionId: score.id })}>Review answers</a>
+          </Button>
+          <Button onClick={onStart}>Start another session</Button>
+        </div>
+      </Card>
+    );
   }
 
   if (!view?.current || (phase !== "answering" && phase !== "submitting" && phase !== "result")) return null;

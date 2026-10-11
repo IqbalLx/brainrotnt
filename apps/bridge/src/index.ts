@@ -15,6 +15,7 @@ import { getSessionScoreRoute } from "./features/get-session-score/route";
 import { skipSessionQuestionRoute } from "./features/skip-session-question/route";
 import { startSessionRoute } from "./features/start-session/route";
 import { revealHintRoute } from "./features/reveal-hint/route";
+import { listSessionsRoute } from "./features/list-sessions/route";
 
 const app = new Hono();
 app.use("*", localOnly);
@@ -36,7 +37,7 @@ app.route("/api/agent-state/stream", createAgentStateStreamRoute(uhpClient));
 app.route("/api/problems/next", getNextProblemRoute);
 app.route("/api/attempts", submitAttemptRoute);
 app.route("/api/flags", flagProblemRoute);
-for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
+for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
   app.route("/api/sessions", route);
 }
 

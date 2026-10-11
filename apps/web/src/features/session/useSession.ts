@@ -30,6 +30,11 @@ export interface SessionScore {
   maxScore: number;
   answered: number;
   correct: number;
+  startedAt: string;
+  endedAt: string;
+  subjects: string[];
+  secondsSpent: number;
+  hintsUsed: number;
   items: {
     position: number;
     problemId: string;
@@ -42,6 +47,9 @@ export interface SessionScore {
     hintsUsed: number;
     explanation: string | null;
     hasExplanation: boolean;
+    type: string;
+    secondsSpent: number | null;
+    answerGiven: unknown;
   }[];
 }
 

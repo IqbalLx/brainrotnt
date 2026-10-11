@@ -86,6 +86,7 @@ A session is a fixed set of questions (default 5) chosen when it starts: problem
 | `GET /api/problems/next?subject=math\|stats\|physics&minDifficulty=1&maxDifficulty=5&exclude=id1,id2` | one random verified problem, `404` when none match |
 | `POST /api/attempts` | grade and record an answer: `{problemId, answer, secondsSpent, agentState}`, where `answer` is a number, a string, an option index, or `{language, code}`; replies `{attemptId, correct, expected, detail}` |
 | `POST /api/sessions` | start a session: `{subjects, minDifficulty, maxDifficulty, size, startedBy}`; picks `size` problems (never-seen first, then least recently seen) and abandons any open session; `404` when none match |
+| `GET /api/sessions?limit=20` | ended sessions, newest first, for the review page |
 | `GET /api/sessions/current` | the open session with its current question, `404` when there is none |
 | `POST /api/sessions/:id/answer` | grade and record the current question: `{position, answer, secondsSpent, agentState}`; replies with the result, the credit and the updated session |
 | `POST /api/sessions/:id/skip` | resolve the current question with no credit: `{position}` |

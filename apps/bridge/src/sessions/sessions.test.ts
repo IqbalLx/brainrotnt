@@ -8,13 +8,14 @@ import { endSessionRoute } from "../features/end-session/route";
 import { getCurrentSessionRoute } from "../features/get-current-session/route";
 import { getSessionScoreRoute } from "../features/get-session-score/route";
 import { revealHintRoute } from "../features/reveal-hint/route";
+import { listSessionsRoute } from "../features/list-sessions/route";
 import { skipSessionQuestionRoute } from "../features/skip-session-question/route";
 import { startSessionRoute } from "../features/start-session/route";
 import { insertProblem, json, postJson, resetDb } from "../test-support";
 import { creditFor } from "./session";
 
 const app = new Hono();
-for (const route of [startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
+for (const route of [listSessionsRoute, startSessionRoute, getCurrentSessionRoute, answerSessionQuestionRoute, skipSessionQuestionRoute, endSessionRoute, getSessionScoreRoute, revealHintRoute]) {
   app.route("/", route);
 }
 
@@ -283,5 +284,32 @@ describe("trivia in sessions", () => {
     await insertProblem({ subject: "math" });
     const view = await started({ subjects: ["trivia"] });
     expect(view).toMatchObject({ size: 1, subjects: ["trivia"], current: { subject: "trivia", unverified: false } });
+  });
+});
+
+describe("reviewing past sessions", () => {
+  test("the score carries time, hints, subjects and what was answered", async () => {
+    await insertProblem({ subject: "math" });
+    await insertProblem({ subject: "math" });
+    const view = await started({ size: 2 });
+    await db.update(sessionItems).set({ hintsRevealed: 1 }).where(eq(sessionItems.position, 0));
+    await answer(view.id, 0, "42");
+    await skip(view.id, 1);
+    const score = await json(await app.request(`/${view.id}/score`));
+    expect(score).toMatchObject({ subjects: ["math"], secondsSpent: 3, hintsUsed: 1 });
+    expect(score.items[0]).toMatchObject({ type: "numeric", secondsSpent: 3, answerGiven: "42" });
+    expect(score.items[1]).toMatchObject({ secondsSpent: null, answerGiven: null });
+  });
+
+  test("lists ended sessions newest first, leaving the open one out", async () => {
+    await insertProblem({ subject: "math" });
+    const first = await started();
+    await app.request(`/${first.id}/end`, { method: "POST" });
+    const second = await started();
+    await app.request(`/${second.id}/end`, { method: "POST" });
+    await started();
+    const list = await json(await app.request("/"));
+    expect(list.map((s: any) => s.id)).toEqual([second.id, first.id]);
+    expect(list[0]).toMatchObject({ endReason: "ended_early", score: 0, size: 1 });
   });
 });
