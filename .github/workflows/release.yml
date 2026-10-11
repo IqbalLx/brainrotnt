@@ -76,7 +76,16 @@ jobs:
         working-directory: release
         run: sha256sum brainrotnt-*.tar.gz > SHA256SUMS && cat SHA256SUMS
 
+      # Works either way round: pushing a tag creates the release here; creating the release in GitHub's UI
+      # (which creates the tag) leaves it as written and attaches the files to it.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" release/* --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" release/* --repo "$REPO" --title "$TAG" --generate-notes
+          fi
