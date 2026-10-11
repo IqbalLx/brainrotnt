@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
-import { DEFAULT_SETTINGS, parseStoredSettings, STORAGE_KEY, type Settings } from "./settings";
+import { DEFAULT_SETTINGS, LEGACY_STORAGE_KEY, parseStoredSettings, STORAGE_KEY, type Settings } from "./settings";
 
 function load(): Settings {
   try {
-    return parseStoredSettings(localStorage.getItem(STORAGE_KEY));
+    return parseStoredSettings(localStorage.getItem(STORAGE_KEY), localStorage.getItem(LEGACY_STORAGE_KEY));
   } catch {
     return DEFAULT_SETTINGS;
   }
