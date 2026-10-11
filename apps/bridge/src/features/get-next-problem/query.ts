@@ -1,6 +1,6 @@
-import { and, between, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, between, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/client";
-import { GRADABLE_TYPES, mcqAnswer, numericAnswer, symbolicAnswer } from "../../db/answer";
+import { CODE_LANGUAGES, codeAnswer, mcqAnswer, numericAnswer, symbolicAnswer, type CodeAnswer } from "../../db/answer";
 import { problems } from "../../db/schema";
 import type { GetNextProblemQuery } from "./schema";
 
@@ -15,6 +15,26 @@ export interface ProblemView {
   choices: string[] | null;
   unit: string | null;
   variables: string[] | null;
+  code: CodeView | null;
+}
+
+export interface CodeView {
+  entry: string;
+  languages: { language: (typeof CODE_LANGUAGES)[number]; starter: string }[];
+  /** The visible tests only. Hidden ones, and every reference solution, stay on the server. */
+  examples: { args: unknown[]; expected: unknown }[];
+}
+
+function codeView(stored: unknown): CodeView {
+  const answer: CodeAnswer = codeAnswer.parse(stored);
+  return {
+    entry: answer.entry,
+    languages: CODE_LANGUAGES.flatMap((language) => {
+      const offered = answer.languages[language];
+      return offered ? [{ language, starter: offered.starter }] : [];
+    }),
+    examples: answer.tests.filter((t) => !t.hidden).map(({ args, expected }) => ({ args, expected })),
+  };
 }
 
 export async function getNextProblem(filters: GetNextProblemQuery): Promise<ProblemView | null> {
@@ -34,7 +54,6 @@ export async function getNextProblem(filters: GetNextProblemQuery): Promise<Prob
       and(
         eq(problems.subject, filters.subject),
         eq(problems.verificationStatus, "verified"),
-        inArray(problems.type, [...GRADABLE_TYPES]),
         between(problems.difficulty, filters.minDifficulty, filters.maxDifficulty),
         filters.exclude.length > 0 ? notInArray(problems.id, filters.exclude) : undefined,
       ),
@@ -52,5 +71,6 @@ export async function getNextProblem(filters: GetNextProblemQuery): Promise<Prob
     choices: row.type === "mcq" ? mcqAnswer.parse(answer).options : null,
     unit: row.type === "numeric" ? (numericAnswer.parse(answer).unit ?? null) : null,
     variables: row.type === "symbolic" ? symbolicAnswer.parse(answer).variables : null,
+    code: row.type === "code" ? codeView(answer) : null,
   };
 }

@@ -22,8 +22,8 @@ describe("import CLI", () => {
   test("imports from any directory, prints a report and exits 0", async () => {
     const { stdout, exitCode } = await run(EXAMPLE);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Imported 3 of 3 items (14 problems added); 0 rejected.");
-    expect(await db.select().from(problems)).toHaveLength(14);
+    expect(stdout).toContain("Imported 4 of 4 items (15 problems added); 0 rejected.");
+    expect(await db.select().from(problems)).toHaveLength(15);
   });
 
   test("exits 1 when anything is rejected", async () => {

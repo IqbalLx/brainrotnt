@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { problems } from "../../db/schema";
-import { mcqSpec, numericSpec, resetDb, symbolicSpec } from "../../test-support";
+import { codeSpec, mcqSpec, numericSpec, resetDb, symbolicSpec } from "../../test-support";
 import { getNextProblemRoute } from "../get-next-problem/route";
 import { submitProblems } from "./command";
 
@@ -152,5 +152,99 @@ describe("symbolic problems", () => {
     ]) {
       expect((await submitProblems([symbolicSpec({ answer })])).inserted).toBe(0);
     }
+  });
+});
+
+describe("code problems", () => {
+  const errorsOf = async (spec: Record<string, unknown>) => {
+    const result = await submitProblems([spec]);
+    expect(result.inserted).toBe(0);
+    return (result.results[0] as any).errors as string[];
+  };
+  const withLanguage = (language: "python" | "javascript", patch: Record<string, string>) => {
+    const spec = codeSpec() as any;
+    return { ...spec, languages: { [language]: { ...spec.languages[language], ...patch } } };
+  };
+
+  test("accepts a problem whose references pass, wrong solutions fail and starters are unsolved", async () => {
+    const result = await submitProblems([codeSpec()]);
+    expect(result).toMatchObject({ inserted: 1, rejected: 0 });
+    const [row] = await db.select().from(problems);
+    expect(row).toMatchObject({ type: "code", subject: "code", verificationStatus: "verified" });
+  });
+
+  test("stores the key and the reference solutions but not the deliberately wrong ones", async () => {
+    await submitProblems([codeSpec()]);
+    const [row] = await db.select().from(problems);
+    const answer = row.answer as any;
+    expect(answer.languages.python.solution).toContain("sum(");
+    expect(JSON.stringify(answer)).not.toContain("n > 0");
+    expect(answer.tests).toHaveLength(5);
+  });
+
+  test("is served with its starters and visible examples only", async () => {
+    await submitProblems([codeSpec()]);
+    const view = await served("code");
+    expect(view).toMatchObject({ type: "code", code: { entry: "solve" } });
+    expect(view.code.languages.map((l: any) => l.language).sort()).toEqual(["javascript", "python"]);
+    expect(view.code.examples).toEqual([
+      { args: [[1, 2, 3, 4]], expected: 6 },
+      { args: [[]], expected: 0 },
+    ]);
+    const text = JSON.stringify(view);
+    expect(text).not.toContain("hidden");
+    expect(text).not.toContain("sum(");
+    expect(text).not.toContain("reduce");
+  });
+
+  test("a reference that fails a test is rejected and names the call", async () => {
+    const errors = await errorsOf(withLanguage("python", { reference: "def solve(numbers):\n    return sum(numbers)\n" }));
+    expect(errors[0]).toContain("python reference solution failed test");
+    expect(errors[0]).toContain("solve([1,2,3,4])");
+  });
+
+  test("a wrong solution that passes every test shows the tests are too weak", async () => {
+    const errors = await errorsOf(withLanguage("javascript", { wrong: "function solve(numbers) {\n  return numbers.filter((n) => n % 2 === 0).reduce((a, b) => a + b, 0);\n}\n" }));
+    expect(errors[0]).toContain("javascript wrong solution passes every test");
+  });
+
+  test("a starter that already solves the problem is rejected", async () => {
+    const errors = await errorsOf(withLanguage("python", { starter: "def solve(numbers):\n    return sum(n for n in numbers if n % 2 == 0)\n" }));
+    expect(errors[0]).toContain("starter code already passes every test");
+  });
+
+  test("a reference that does not load is reported with the reason", async () => {
+    const errors = await errorsOf(withLanguage("python", { reference: "def solve(numbers)\n    return 0\n" }));
+    expect(errors[0]).toContain("python reference solution could not run");
+    expect(errors[0]).toContain("SyntaxError");
+  });
+
+  test("the test list must keep some tests hidden and some visible", async () => {
+    const allVisible = codeSpec() as any;
+    allVisible.answer.tests = allVisible.answer.tests.map((t: any) => ({ ...t, hidden: false }));
+    expect((await errorsOf(allVisible)).join(" ")).toContain("at least two tests must be hidden");
+
+    const allHidden = codeSpec() as any;
+    allHidden.answer.tests = allHidden.answer.tests.map((t: any) => ({ ...t, hidden: true }));
+    expect((await errorsOf(allHidden)).join(" ")).toContain("at least one test must be visible");
+  });
+
+  test("code problems belong to the code subject, and other types cannot use it", async () => {
+    expect((await errorsOf(codeSpec({ subject: "math" }))).join(" ")).toContain("subject");
+    expect((await errorsOf(numericSpec({ subject: "code" }))).join(" ")).toContain("subject");
+  });
+
+  test("tests must be plain JSON, with an expected value", async () => {
+    const dated = codeSpec() as any;
+    dated.answer.tests[0] = { args: [new Date()], expected: 1 };
+    expect((await errorsOf(dated))[0]).toContain("answer.tests.0.args.0: must be a plain JSON value");
+
+    const missing = codeSpec() as any;
+    delete missing.answer.tests[1].expected;
+    expect((await errorsOf(missing))[0]).toContain("answer.tests.1.expected");
+  });
+
+  test("at least one language is required", async () => {
+    expect((await errorsOf(codeSpec({ languages: {} }))).join(" ")).toContain("at least one language");
   });
 });

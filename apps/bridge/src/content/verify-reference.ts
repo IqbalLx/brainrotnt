@@ -1,7 +1,8 @@
 import { checkEquivalent, verifyKeyAgainstPoints } from "@brainrotnt/math-engine";
 import { z } from "zod";
 import { runPython, type SandboxResult } from "../infra/sandbox-runner";
-import type { ProblemSpec } from "./problem-spec";
+import type { CodeSpec, ProblemSpec } from "./problem-spec";
+import { describeTestFailure, runTests, type TestReport } from "./run-tests";
 
 export type VerifyResult = { ok: true } | { ok: false; error: string };
 
@@ -31,6 +32,7 @@ function lastLine(output: string): string {
 const EPSILON = 1e-9;
 
 export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> {
+  if (spec.type === "code") return verifyCode(spec);
   const run = await runPython(spec.reference.code);
   if (!run.ok) return { ok: false, error: describeFailure(run) };
 
@@ -57,6 +59,43 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
   const allowed = Math.max(value === 0 ? tolerance : tolerance * Math.abs(value), EPSILON * Math.max(1, Math.abs(value)));
   if (Math.abs(computed - value) > allowed) {
     return { ok: false, error: `reference solution computed ${computed} but the stated key is ${value} (tolerance ${tolerance})` };
+  }
+  return { ok: true };
+}
+
+const languageNames = ["python", "javascript"] as const;
+
+function whyNotRun(report: Exclude<TestReport, { status: "ran" }>): string {
+  return report.status === "broken" ? report.message : `${report.reason}: ${report.message}`;
+}
+
+// A code problem is only as good as its tests, so each offered language has to show that the tests
+// accept a correct solution, reject a wrong one, and are not already satisfied by the starter code.
+async function verifyCode(spec: CodeSpec): Promise<VerifyResult> {
+  const { entry, tests } = spec.answer;
+  for (const language of languageNames) {
+    const offered = spec.languages[language];
+    if (!offered) continue;
+
+    const reference = await runTests(language, offered.reference, { entry, tests });
+    if (reference.status !== "ran") return { ok: false, error: `${language} reference solution could not run: ${whyNotRun(reference)}` };
+    if (reference.firstFailure) {
+      return {
+        ok: false,
+        error: `${language} reference solution failed test ${reference.firstFailure.index}: ${describeTestFailure(entry, { ...reference.firstFailure, hidden: false })}`,
+      };
+    }
+
+    const wrong = await runTests(language, offered.wrong, { entry, tests });
+    if (wrong.status !== "ran") return { ok: false, error: `${language} wrong solution must still load and run: ${whyNotRun(wrong)}` };
+    if (!wrong.firstFailure) {
+      return { ok: false, error: `${language} wrong solution passes every test, so the tests cannot tell right from wrong; add tests that catch it` };
+    }
+
+    const starter = await runTests(language, offered.starter, { entry, tests });
+    if (starter.status === "ran" && !starter.firstFailure) {
+      return { ok: false, error: `${language} starter code already passes every test; it must leave the problem unsolved` };
+    }
   }
   return { ok: true };
 }

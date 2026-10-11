@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /*
- * Runs untrusted Python (reference solutions and generators written by an AI agent, possibly from
- * injected source material) in a subprocess with a time limit, resource limits, a scrubbed
+ * Runs untrusted Python or JavaScript (reference solutions and generators written by an AI agent,
+ * possibly from injected source material, and code a student submits) in a subprocess with a time limit, resource limits, a scrubbed
  * environment, an empty working directory and, where the OS allows, no network.
  *
  * Network isolation uses a Linux network namespace (`unshare -rn`). Where it is unavailable the
@@ -14,8 +14,19 @@ import { join } from "node:path";
 
 export interface SandboxOptions {
   timeoutMs?: number;
+  /** Address-space limit (`ulimit -v`). 0 turns it off. */
   memoryMb?: number;
   maxOutputBytes?: number;
+}
+
+export type Language = "python" | "javascript";
+
+export interface Program {
+  language: Language;
+  /** Files written to the empty working directory, by name. */
+  files: Record<string, string>;
+  /** The file to execute; it must be one of `files`. */
+  main: string;
 }
 
 export type SandboxFailure = "timeout" | "output_too_large" | "nonzero_exit" | "sandbox_unavailable" | "spawn_failed";
@@ -62,7 +73,7 @@ function limitsScript(memoryMb: number, timeoutMs: number): string {
   // Each limit is best effort: `ulimit -v` is not supported everywhere (macOS), so a failure is not fatal.
   return [
     `ulimit -t ${cpuSeconds} 2>/dev/null`,
-    `ulimit -v ${memoryMb * 1024} 2>/dev/null`,
+    memoryMb > 0 ? `ulimit -v ${memoryMb * 1024} 2>/dev/null` : "true",
     "ulimit -f 2048 2>/dev/null",
     "ulimit -n 64 2>/dev/null",
     "ulimit -c 0 2>/dev/null",
@@ -84,7 +95,12 @@ async function readCapped(stream: ReadableStream<Uint8Array>, limit: number, onO
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function runPython(code: string, options: SandboxOptions = {}): Promise<SandboxResult> {
+export function runPython(code: string, options: SandboxOptions = {}): Promise<SandboxResult> {
+  return runProgram({ language: "python", files: { "main.py": code }, main: "main.py" }, options);
+}
+
+export async function runProgram(program: Program, options: SandboxOptions = {}): Promise<SandboxResult> {
+  const javascript = program.language === "javascript";
   const { timeoutMs, memoryMb, maxOutputBytes } = { ...DEFAULTS, ...options };
   const started = performance.now();
   const elapsed = () => Math.round(performance.now() - started);
@@ -105,12 +121,14 @@ export async function runPython(code: string, options: SandboxOptions = {}): Pro
     );
   }
 
-  const python = Bun.which("python3") as string;
+  // The server's own Bun runs JavaScript, so there is nothing extra to install.
+  const interpreter = javascript ? process.execPath : (Bun.which("python3") as string);
+  const flags = javascript ? '--no-install "$1"' : '-I -B "$1"';
   const dir = await mkdtemp(join(tmpdir(), "brainrotnt-sandbox-"));
   try {
-    await writeFile(join(dir, "main.py"), code, "utf8");
-    const script = `${limitsScript(memoryMb, timeoutMs)}; exec "$0" -I -B main.py`;
-    const command = ["sh", "-c", script, python];
+    for (const [name, content] of Object.entries(program.files)) await writeFile(join(dir, name), content, "utf8");
+    const script = `${limitsScript(memoryMb, timeoutMs)}; exec "$0" ${flags}`;
+    const command = ["sh", "-c", script, interpreter, program.main];
     if (mode === "strict") command.unshift(unshareBin(), "-rn", "--");
 
     let timedOut = false;
@@ -118,7 +136,14 @@ export async function runPython(code: string, options: SandboxOptions = {}): Pro
     const proc = Bun.spawn(command, {
       cwd: dir,
       // Nothing from the parent's environment (tokens, paths, proxies) reaches the code.
-      env: { PATH: "/usr/bin:/bin", LANG: "C.UTF-8", PYTHONDONTWRITEBYTECODE: "1", PYTHONHASHSEED: "0" },
+      env: {
+        PATH: "/usr/bin:/bin",
+        LANG: "C.UTF-8",
+        PYTHONDONTWRITEBYTECODE: "1",
+        PYTHONHASHSEED: "0",
+        // Bun wants a writable home for its caches; the empty working directory is the only one it gets.
+        ...(javascript ? { HOME: dir, TMPDIR: dir } : {}),
+      },
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",

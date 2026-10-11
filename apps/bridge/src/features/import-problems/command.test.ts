@@ -30,15 +30,15 @@ const fixed = (n: number) => `
 describe("importFiles", () => {
   test("the shipped example imports cleanly: it must not rot", async () => {
     const report = await importFiles([EXAMPLE]);
-    expect(report).toMatchObject({ items: 3, inserted: 3, rejected: 0, problemsAdded: 14, fileErrors: 0 });
-    expect(await db.select().from(problems)).toHaveLength(14);
+    expect(report).toMatchObject({ items: 4, inserted: 4, rejected: 0, problemsAdded: 15, fileErrors: 0 });
+    expect(await db.select().from(problems)).toHaveLength(15);
   });
 
   test("running it again refuses every item as a duplicate", async () => {
     await importFiles([EXAMPLE]);
     const again = await importFiles([EXAMPLE]);
-    expect(again).toMatchObject({ inserted: 0, rejected: 3 });
-    expect(await db.select().from(problems)).toHaveLength(14);
+    expect(again).toMatchObject({ inserted: 0, rejected: 4 });
+    expect(await db.select().from(problems)).toHaveLength(15);
   });
 
   test("a mixed file reports each item and keeps the good ones", async () => {

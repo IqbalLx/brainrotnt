@@ -13,8 +13,8 @@ describe("getSchema", () => {
     expect(text).toContain("{\\\"points\\\"");
     expect(Object.keys(schema.templateSpec as object)).toContain("anyOf");
     expect(JSON.stringify(schema.templateSpec)).toContain("random.Random(seed)");
-    expect(schema.supported.types).toEqual(["mcq", "numeric", "symbolic"]);
-    expect(schema.supported.subjects).toEqual(["math", "stats", "physics"]);
+    expect(schema.supported.types).toEqual(["mcq", "numeric", "symbolic", "code"]);
+    expect(schema.supported.subjects).toEqual(["math", "stats", "physics", "code"]);
     expect(schema.limits.maxProblemsPerSubmit).toBe(25);
   });
 });

@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
+import { codeAnswer, codeTest, mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
+import { ENTRY_PATTERN } from "../infra/code-runner";
 
-const base = {
+const common = {
   id: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-]{2,63}$/, "lowercase letters, digits and hyphens, 3 to 64 characters")
     .optional()
     .describe("Optional stable id. Generated from the subject, topic and statement when omitted."),
-  subject: z.enum(["math", "stats", "physics"]).describe("The subject. Code problems are not supported yet."),
   topic: z
     .string()
     .trim()
@@ -23,6 +23,8 @@ const base = {
     .default({}),
   source: z.string().trim().max(200).optional().describe("A pointer to where the syllabus topic comes from, such as a chapter. Never copied text."),
 };
+
+const base = { ...common, subject: z.enum(["math", "stats", "physics"]).describe("The subject. Programming problems use type code instead.") };
 
 const fixed = {
   statement: z
@@ -48,7 +50,55 @@ const fixed = {
     .describe("The reference solution. The server runs it and rejects the problem if it disagrees with the stated answer."),
 };
 
+const codeLanguageSpec = z.object({
+  starter: z
+    .string()
+    .max(5000)
+    .describe("The code the student starts from: the function signature with a TODO body that does NOT already solve the problem."),
+  reference: z.string().min(1).max(20_000).describe("A correct solution defining the entry function. It must pass every test."),
+  wrong: z
+    .string()
+    .min(1)
+    .max(20_000)
+    .describe("A plausible but WRONG solution (for example an off-by-one). The tests must catch it, which proves they are strong enough."),
+});
+
+const codeSpec = z.object({
+  ...common,
+  subject: z.literal("code"),
+  type: z.literal("code"),
+  statement: fixed.statement.describe(
+    "Plain text. State exactly what the function receives and must return (JSON values only: numbers, strings, booleans, null, arrays, objects) " +
+      "and show the visible tests as examples. Original wording only.",
+  ),
+  answer: z.object({
+    entry: z.string().regex(ENTRY_PATTERN, "a function name: letters, digits and underscores").default("solve").describe("The function name the student must define."),
+    tests: z
+      .array(codeTest)
+      .min(4)
+      .max(50)
+      .describe("Calls as {args: [...], expected: <JSON>, hidden?: boolean}. Include at least 1 visible example and at least 2 hidden tests, with edge cases among the hidden ones."),
+  }),
+  languages: z
+    .object({ python: codeLanguageSpec.optional(), javascript: codeLanguageSpec.optional() })
+    .describe("The languages offered. Every offered language is verified: its reference must pass all tests and its wrong solution must fail at least one."),
+});
+
+export type CodeSpec = z.infer<typeof codeSpec>;
+
+/** What is stored: the key and the reference solutions, but not the deliberately wrong ones. */
+export function storedAnswer(spec: ProblemSpec): unknown {
+  if (spec.type !== "code") return spec.answer;
+  const languages = Object.fromEntries(
+    Object.entries(spec.languages)
+      .filter(([, lang]) => lang !== undefined)
+      .map(([name, lang]) => [name, { starter: lang!.starter, solution: lang!.reference }]),
+  );
+  return codeAnswer.parse({ entry: spec.answer.entry, tests: spec.answer.tests, languages });
+}
+
 export const problemSpec = z.discriminatedUnion("type", [
+  codeSpec,
   z.object({ ...base,
     ...fixed, type: z.literal("mcq"), answer: mcqAnswer.describe("options (2 to 8 strings) and the 0-based index of the correct one.") }),
   z.object({
@@ -76,6 +126,13 @@ export function issuesOf(error: z.ZodError): string[] {
 
 // Things the schema cannot express.
 export function semanticIssues(spec: ProblemSpec): string[] {
+  if (spec.type === "code") {
+    const issues: string[] = [];
+    if (!Object.values(spec.languages).some(Boolean)) issues.push("languages: offer at least one language");
+    if (!spec.answer.tests.some((t) => !t.hidden)) issues.push("answer.tests: at least one test must be visible, as an example");
+    if (spec.answer.tests.filter((t) => t.hidden).length < 2) issues.push("answer.tests: at least two tests must be hidden, so a hard-coded answer fails");
+    return issues;
+  }
   if (spec.type !== "mcq") return [];
   const keys = spec.answer.options.map((option) => option.trim().toLowerCase());
   return new Set(keys).size === keys.length ? [] : ["answer.options: options must be distinct"];
