@@ -10,6 +10,7 @@
     "db:generate": "bun --filter bridge db:generate",
     "db:migrate": "bun --filter bridge db:migrate",
     "db:seed": "bun --filter bridge db:seed",
-    "test": "bun --filter bridge test && bun --filter web test"
+    "test": "bun --filter bridge test && bun --filter web test",
+    "import": "bun run apps/bridge/src/features/import-problems/cli.ts"
   }
 }
