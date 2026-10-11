@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mcqAnswer, numericAnswer } from "../db/answer";
+import { mcqAnswer, numericAnswer, symbolicAnswer } from "../db/answer";
 
 const base = {
   id: z
@@ -39,7 +39,9 @@ const fixed = {
         .max(20_000)
         .describe(
           "Python 3 that computes the answer from scratch (do not just print the key) and prints ONE JSON value on its last line: " +
-            "a number for a numeric problem, or the integer index of the correct option for a multiple-choice one. " +
+            "a number for a numeric problem, the integer index of the correct option for a multiple-choice one, or for a symbolic one " +
+            '{"points": [{"vars": {"x": 1.5}, "value": 12.25}, ...]} with at least 6 points, each computed independently of the key ' +
+            "(for example by numerical differentiation or direct evaluation) and accurate to about 1e-5. " +
             "It runs in a sandbox with no network, 5 seconds and 512 MB.",
         ),
     })
@@ -49,6 +51,15 @@ const fixed = {
 export const problemSpec = z.discriminatedUnion("type", [
   z.object({ ...base,
     ...fixed, type: z.literal("mcq"), answer: mcqAnswer.describe("options (2 to 8 strings) and the 0-based index of the correct one.") }),
+  z.object({
+    ...base,
+    ...fixed,
+    type: z.literal("symbolic"),
+    answer: symbolicAnswer.describe(
+      "expression (the key, in calculator syntax such as 3*x^2+2), variables (1 to 3 single letters other than e and i) and an optional domain [low, high] (default [-5, 5]). " +
+        "Any expression equivalent to the key is accepted, so the key only needs to be correct, not the only correct form.",
+    ),
+  }),
   z.object({
     ...base,
     ...fixed,

@@ -88,9 +88,39 @@ describe("mcq grading", () => {
   });
 });
 
+describe("symbolic grading", () => {
+  const stored = { expression: "3*x^2 + 2", variables: ["x"], domain: [-5, 5] };
+  const graded = (given: unknown) => grade("symbolic", stored, given);
+
+  test("any equivalent form is correct", () => {
+    for (const given of ["3*x^2 + 2", "3x^2+2", "2 + 3x^2", "3*(x^2) + 2", "(6*x^2 + 4)/2"]) {
+      expect(graded(given)).toEqual({ status: "graded", correct: true, expected: "3*x^2 + 2" });
+    }
+  });
+
+  test("a different expression is incorrect and reveals the key", () => {
+    expect(graded("3*x^2")).toEqual({ status: "graded", correct: false, expected: "3*x^2 + 2" });
+    expect(graded("3x + 2")).toMatchObject({ status: "graded", correct: false });
+    expect(graded("3*x^2 + 2.001")).toMatchObject({ status: "graded", correct: false });
+  });
+
+  test("unreadable or disallowed input is invalid, not incorrect", () => {
+    expect(graded("y^2")).toEqual({ status: "invalid", message: "y is not a variable here; use x" });
+    expect(graded("")).toMatchObject({ status: "invalid" });
+    expect(graded("evaluate('1+1')")).toMatchObject({ status: "invalid" });
+    expect(graded("a = 3")).toMatchObject({ status: "invalid" });
+    expect(graded("3x +")).toMatchObject({ status: "invalid" });
+    expect(graded(42)).toEqual({ status: "invalid", message: "Enter an expression, like 2x + 1." });
+  });
+
+  test("a broken key is reported without blaming the student", () => {
+    const result = grade("symbolic", { expression: "sqrt(x)", variables: ["x"], domain: [-5, -1] }, "sqrt(x)");
+    expect(result).toEqual({ status: "invalid", message: expect.stringContaining("Flag it") });
+  });
+});
+
 describe("other types", () => {
-  test("symbolic and code are not gradable yet", () => {
-    expect(grade("symbolic", {}, "x")).toEqual({ status: "unsupported" });
+  test("code is not gradable yet", () => {
     expect(grade("code", {}, "x")).toEqual({ status: "unsupported" });
   });
 });

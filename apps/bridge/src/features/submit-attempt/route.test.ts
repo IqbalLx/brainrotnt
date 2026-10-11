@@ -51,9 +51,23 @@ describe("POST /api/attempts", () => {
     expect((await submitAttemptRoute.request("/", postJson({ ...attempt("x", "1"), secondsSpent: -1 }))).status).toBe(400);
   });
 
-  test("symbolic problems are not gradable", async () => {
-    const id = await insertProblem({ type: "symbolic", answer: { expression: "x" } });
+  test("code problems are not gradable yet", async () => {
+    const id = await insertProblem({ type: "code", answer: {} });
     expect((await submitAttemptRoute.request("/", postJson(attempt(id, "x")))).status).toBe(422);
+  });
+
+  test("symbolic answers: equivalent forms are correct, others are not, and unreadable ones are not recorded", async () => {
+    const id = await insertProblem({ type: "symbolic", answer: { expression: "3*x^2 + 2", variables: ["x"], domain: [-5, 5] } });
+
+    const right = await submitAttemptRoute.request("/", postJson(attempt(id, "2 + 3x^2")));
+    expect(await json(right)).toMatchObject({ correct: true, expected: "3*x^2 + 2" });
+    const wrong = await submitAttemptRoute.request("/", postJson(attempt(id, "3x^2")));
+    expect(await json(wrong)).toMatchObject({ correct: false });
+
+    const unreadable = await submitAttemptRoute.request("/", postJson(attempt(id, "y + 1")));
+    expect(unreadable.status).toBe(422);
+    expect(await json(unreadable)).toMatchObject({ error: "invalid_answer", message: "y is not a variable here; use x" });
+    expect(await db.select().from(attempts).where(eq(attempts.problemId, id))).toHaveLength(2);
   });
 });
 
@@ -72,8 +86,16 @@ describe("GET /api/problems/next", () => {
     expect(body).not.toHaveProperty("answer");
   });
 
-  test("exclude skips listed ids; symbolic and code are never served", async () => {
-    const a = await insertProblem({ subject: "code", topic: "exclude-test", type: "symbolic", answer: {} });
+  test("symbolic problems expose their variables but never the key", async () => {
+    await insertProblem({ subject: "math", type: "symbolic", answer: { expression: "3*x^2 + 2", variables: ["x"], domain: [-5, 5] } });
+    const body = await json(await getNextProblemRoute.request("/?subject=math"));
+    expect(body).toMatchObject({ type: "symbolic", variables: ["x"], choices: null, unit: null });
+    expect(JSON.stringify(body)).not.toContain("3*x^2");
+    expect(body).not.toHaveProperty("answer");
+  });
+
+  test("exclude skips listed ids; code problems are never served", async () => {
+    const a = await insertProblem({ subject: "code", topic: "exclude-test", type: "code", answer: {} });
     expect((await getNextProblemRoute.request("/?subject=code")).status).toBe(404);
     const b = await insertProblem({ subject: "stats", topic: "exclude-test" });
     const res = await getNextProblemRoute.request(`/?subject=stats&exclude=${b}`);

@@ -1,3 +1,5 @@
+import { checkEquivalent, verifyKeyAgainstPoints } from "@brainrotnt/math-engine";
+import { z } from "zod";
 import { runPython, type SandboxResult } from "../infra/sandbox-runner";
 import type { ProblemSpec } from "./problem-spec";
 
@@ -39,6 +41,8 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
     return { ok: false, error: "reference solution must print one JSON value on its last line" };
   }
 
+  if (spec.type === "symbolic") return verifySymbolic(spec.answer, computed);
+
   if (spec.type === "mcq") {
     if (computed !== spec.answer.correct) {
       return { ok: false, error: `reference solution picked option ${JSON.stringify(computed)} but the stated key is ${spec.answer.correct}` };
@@ -55,6 +59,33 @@ export async function verifyReference(spec: ProblemSpec): Promise<VerifyResult> 
     return { ok: false, error: `reference solution computed ${computed} but the stated key is ${value} (tolerance ${tolerance})` };
   }
   return { ok: true };
+}
+
+const referencePoints = z.object({
+  points: z
+    .array(z.object({ vars: z.record(z.string(), z.number().finite()), value: z.number().finite() }))
+    .min(6, "give at least 6 points")
+    .max(200),
+});
+
+function verifySymbolic(answer: Extract<ProblemSpec, { type: "symbolic" }>["answer"], computed: unknown): VerifyResult {
+  const parsed = referencePoints.safeParse(computed);
+  if (!parsed.success) {
+    return { ok: false, error: `reference solution must print {"points": [{"vars": {...}, "value": number}, ...]}: ${parsed.error.issues[0]?.message ?? "wrong shape"}` };
+  }
+
+  const expected = [...answer.variables].sort().join(",");
+  for (const point of parsed.data.points) {
+    if (Object.keys(point.vars).sort().join(",") !== expected) {
+      return { ok: false, error: `every point must give exactly the variables ${answer.variables.join(", ")}` };
+    }
+  }
+
+  const key = checkEquivalent(answer.expression, answer.expression, answer);
+  if (!key.ok) return { ok: false, error: key.error };
+
+  const verdict = verifyKeyAgainstPoints(answer.expression, answer.variables, parsed.data.points);
+  return verdict.ok ? { ok: true } : { ok: false, error: `reference solution disagrees with the key: ${verdict.error}` };
 }
 
 // Verifies several problems with a few sandboxes running at once.

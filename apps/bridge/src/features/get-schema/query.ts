@@ -8,7 +8,7 @@ export function getSchema() {
     templateSpec: zodToJsonSchema(templateSpec, { $refStrategy: "none" }),
     supported: {
       subjects: ["math", "stats", "physics"],
-      types: ["mcq", "numeric"],
+      types: ["mcq", "numeric", "symbolic"],
       calculatorTiers: ["none", "basic", "scientific", "stats"],
       difficulty: "1 to 5",
     },

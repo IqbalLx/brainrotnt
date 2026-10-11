@@ -60,10 +60,12 @@ export function AnswerInput({ problem, text, choice, onText, onChoice, result, l
         >
           <input
             autoFocus
-            inputMode="decimal"
+            inputMode={problem.type === "symbolic" ? "text" : "decimal"}
             autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
             aria-label="Your answer"
-            placeholder="Your answer"
+            placeholder={problem.type === "symbolic" ? "Expression, e.g. 2x + 1" : "Your answer"}
             value={text}
             disabled={locked}
             onChange={(e) => onText(e.target.value)}
@@ -73,6 +75,10 @@ export function AnswerInput({ problem, text, choice, onText, onChoice, result, l
           {result?.correct && <Check className="size-4 text-success" aria-hidden />}
           {result && !result.correct && <X className="size-4 text-danger" aria-hidden />}
         </div>
+      )}
+
+      {problem.type === "symbolic" && !result && problem.variables && (
+        <p className="text-body-sm text-ink-muted">Answer in terms of {problem.variables.join(", ")}. Any equivalent form is accepted.</p>
       )}
 
       {result && (
