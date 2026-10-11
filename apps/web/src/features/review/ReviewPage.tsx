@@ -100,7 +100,7 @@ function ReviewItem({ item, open, onToggle }: { item: Item; open: boolean; onTog
             ) : item.hasExplanation ? (
               <p className="flex items-center gap-2 text-body-sm text-ink-faint">
                 <Lock className="size-3.5" aria-hidden />
-                Explanation locked: this question was not answered.
+                Explanation locked: this question was {item.outcome === "skipped" ? "skipped" : "not answered"}. Answer it in a later session to unlock it.
               </p>
             ) : (
               <p className="text-body-sm text-ink-faint">This problem has no explanation yet.</p>
@@ -124,7 +124,7 @@ function SessionPicker({ sessions, current }: { sessions: SessionSummaryRow[]; c
       >
         {sessions.map((s) => (
           <option key={s.id} value={s.id}>
-            {when(s.endedAt)} · {formatPoints(s.score)}/{s.size}
+            {when(s.endedAt)} · {formatPoints(s.score)}/{s.maxScore}
           </option>
         ))}
       </select>
@@ -160,7 +160,13 @@ export function ReviewPage({ sessionId, refresh, onStartAnother }: { sessionId: 
   }
 
   const { score, sessions } = state;
-  const accuracy = score.answered > 0 ? Math.round((score.correct / score.answered) * 100) : null;
+  // Accuracy and points are out of the questions answered or skipped, so a skip counts as a miss;
+  // questions never reached before the session ended count for nothing either way.
+  const accuracy = score.maxScore > 0 ? Math.round((score.correct / score.maxScore) * 100) : null;
+  const notCounted = [
+    score.skipped > 0 && `${score.skipped} skipped`,
+    score.unanswered > 0 && `${score.unanswered} not reached, not counted`,
+  ].filter(Boolean);
   const toggle = (position: number) =>
     setOpen((current) => {
       const next = new Set(current);
@@ -181,7 +187,7 @@ export function ReviewPage({ sessionId, refresh, onStartAnother }: { sessionId: 
           </div>
           <h2 className="text-display-lg font-sans text-ink">Session review</h2>
           <p className="text-body text-ink-muted">
-            {score.maxScore} {score.maxScore === 1 ? "question" : "questions"} · {formatDuration(score.secondsSpent)} spent answering
+            {score.maxScore} of {score.items.length} {score.items.length === 1 ? "question" : "questions"} attempted · {formatDuration(score.secondsSpent)} spent answering
           </p>
         </div>
         <SessionPicker sessions={sessions} current={score.id} />
@@ -192,14 +198,14 @@ export function ReviewPage({ sessionId, refresh, onStartAnother }: { sessionId: 
           label="Accuracy"
           icon={<Target className="size-4" />}
           value={accuracy === null ? "–" : `${accuracy}%`}
-          unit={`${score.correct} / ${score.answered}`}
+          unit={`${score.correct} / ${score.maxScore}`}
           note={
             <div className="h-1 overflow-hidden rounded-full bg-surface-high">
               <div className="h-full bg-success" style={{ width: `${accuracy ?? 0}%` }} />
             </div>
           }
         />
-        <StatCard label="Points" icon={<Check className="size-4" />} value={formatPoints(score.score)} unit={`of ${score.maxScore}`} note={`${score.maxScore - score.answered} skipped or unanswered`} />
+        <StatCard label="Points" icon={<Check className="size-4" />} value={formatPoints(score.score)} unit={`of ${score.maxScore}`} note={notCounted.length > 0 ? notCounted.join(" · ") : undefined} />
         <StatCard
           label="Focused time"
           icon={<Clock className="size-4" />}
