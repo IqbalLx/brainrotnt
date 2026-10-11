@@ -6,14 +6,25 @@ import { PATH_BEGIN, PATH_END, removePathBlock } from "./shell-path";
 
 describe("parseArgs", () => {
   test("no arguments starts on the default port, localhost only", () => {
-    expect(parseArgs([])).toEqual({ name: "start", port: null, network: false, open: false, allowRemoteCode: false });
+    expect(parseArgs([])).toEqual({ name: "start", port: null, network: false, open: false, allowRemoteCode: false, hosts: [] });
     expect(parseArgs(["start"])).toMatchObject({ name: "start" });
   });
 
   test("start options", () => {
-    expect(parseArgs(["--port", "9000", "-n", "-o"])).toEqual({ name: "start", port: 9000, network: true, open: true, allowRemoteCode: false });
+    expect(parseArgs(["--port", "9000", "-n", "-o"])).toEqual({ name: "start", port: 9000, network: true, open: true, allowRemoteCode: false, hosts: [] });
     expect(parseArgs(["--port=9001"])).toMatchObject({ port: 9001 });
     expect(parseArgs(["-n", "--allow-remote-code"])).toMatchObject({ network: true, allowRemoteCode: true });
+  });
+
+  test("--host adds names to answer to in network mode, as the access check compares them", () => {
+    expect(parseArgs(["-n", "--host", "100.101.102.103", "--host=Box.tail1234.TS.net"])).toMatchObject({ hosts: ["100.101.102.103", "box.tail1234.ts.net"] });
+    expect(parseArgs(["-n", "--host", "fd7a:115c:a1e0::1"])).toMatchObject({ hosts: ["[fd7a:115c:a1e0::1]"] });
+    expect(parseArgs(["-n", "--host", "a.example", "--host", "A.example"])).toMatchObject({ hosts: ["a.example"] });
+    for (const bad of ["http://box", "box:8787", "100.101.102.103:8787", "box/x", "user@box", ""]) {
+      expect(parseArgs(["-n", "--host", bad])).toMatchObject({ name: "error" });
+    }
+    expect(parseArgs(["-n", "--host"])).toMatchObject({ name: "error" });
+    expect(parseArgs(["--host", "box"])).toMatchObject({ name: "error" });
   });
 
   test("bad input is an error, not a guess", () => {
