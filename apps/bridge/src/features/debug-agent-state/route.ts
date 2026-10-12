@@ -10,13 +10,15 @@ const injectSchema = z.object({
   project: z.string().default("brainrotnt"),
   cwd: z.string().default(""),
   branch: z.string().nullable().default(null),
+  machine: z.string().nullable().default(null),
 });
 
 /**
  * Splits "the UI does not update" into its three hops:
  *   GET  /api/debug/agent-state   what the UHP client saw from Luvus (frame counts per event, the recent
  *                                 frames it acted on and what it did with each; ?frames=N, default 50),
- *                                 its pane table, and how many SSE clients are listening.
+ *                                 its pane table, each source (this computer's socket and every Luvus
+ *                                 machine followed over SSH), and how many SSE clients are listening.
  *   POST /api/debug/agent-state   {status, ...} publishes a state as if Luvus sent it, so the SSE stream
  *                                 and the UI can be tested without Luvus.
  * Like every route, it answers only localhost (see infra/local-only).

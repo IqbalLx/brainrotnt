@@ -8,6 +8,7 @@ import { findRunning, releaseLock, writeLock } from "./lock";
 import { lanAddresses } from "./network";
 import { luvusSocket, type Paths } from "./paths";
 import { listenOnFreePort, PortInUseError } from "./ports";
+import type { UhpDebugSnapshot } from "../infra/uhp-client";
 import { bold, cyan, dim, green, openInBrowser, red, yellow } from "./ui";
 
 export interface StartContext {
@@ -121,10 +122,17 @@ async function settleAgent(client: { debug(): { connection: string } }) {
   for (let i = 0; i < 10 && client.debug().connection === "connecting"; i++) await Bun.sleep(50);
 }
 
-function agentLine(client: { debug(): { connection: string; socketPath: string | null } }): string {
-  const { connection, socketPath } = client.debug();
-  if (connection === "subscribed") return `${green("connected")} ${dim(`· Luvus · ${socketPath}`)}`;
-  return `${yellow("waiting for Luvus")} ${dim(`· ${socketPath} · it connects by itself once Luvus runs`)}`;
+function agentLine(client: { debug(): UhpDebugSnapshot }): string {
+  const { connection, socketPath, sources, machines } = client.debug();
+  const local =
+    connection === "subscribed"
+      ? `${green("connected")} ${dim(`· Luvus · ${socketPath}`)}`
+      : `${yellow("waiting for Luvus")} ${dim(`· ${socketPath} · it connects by itself once Luvus runs`)}`;
+  const remotes = sources.filter((source) => source.machine !== null);
+  if (remotes.length === 0) return machines && !machines.startsWith("none") ? `${local}\n  ${dim("machines")}  ${dim(machines)}` : local;
+  // SSH takes longer than the banner waits, so a machine still connecting is normal here.
+  const list = remotes.map((source) => (source.connection === "subscribed" ? green(source.name) : `${source.name} ${dim(`(${source.connection})`)}`));
+  return `${local}\n  ${dim("machines")}  ${list.join(dim(", "))} ${dim("· over SSH")}`;
 }
 
 const SANDBOX_LINE: Record<string, string> = {

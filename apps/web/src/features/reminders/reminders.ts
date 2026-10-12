@@ -26,17 +26,31 @@ const same = (a: ReminderKey | null, b: ReminderKey) => a !== null && a.kind ===
 
 const busy = (status: AgentState | null) => status === "working" || status === "blocked";
 
+/** The state at a finish: when, and on which pane (unique across Luvus machines). */
+export interface FinishPoint {
+  status: AgentState;
+  pane: string;
+  at: string;
+}
+
 /**
- * When the agent last finished a run, or null while it is running. Luvus reports a finished turn as
- * Done or as Idle (and moves Done to Idle after a while), so leaving Working or Blocked for either one
- * counts, and Done to Idle keeps the same moment. A first Done counts too, so a page loaded after the
+ * The finish the done reminder is about, or null while nothing has finished. Luvus reports a finished
+ * turn as Done or as Idle (and moves Done to Idle after a while), so leaving Working or Blocked for either
+ * one counts, and Done to Idle keeps the same finish. A first Done counts too, so a page loaded after the
  * agent finished still reminds; a first Idle does not, since nothing says a run just ended.
+ *
+ * With agents on several panes or machines, one finish stands for them all until it is acknowledged
+ * (`acknowledged`: the session it reminded about has ended): another agent starting or finishing keeps
+ * it, so the reminder neither disappears nor comes back as new. Only the agent that finished starting
+ * again clears it. Agents that overlap need nothing here: the bridge shows Working while any of them
+ * works, so only the last one to finish is seen finishing.
  */
-export function nextFinishedAt(previous: AgentState | null, status: AgentState, at: string, finishedAt: string | null): string | null {
-  if (busy(status)) return null;
-  if (busy(previous)) return at;
-  if (finishedAt === null && status === "done") return at;
-  return finishedAt;
+export function nextFinish<T extends FinishPoint>(previous: AgentState | null, next: T, finish: T | null, acknowledged: boolean): T | null {
+  const held = finish !== null && !acknowledged;
+  if (busy(next.status)) return held && next.pane !== finish.pane ? finish : null;
+  if (busy(previous)) return held ? finish : next;
+  if (finish === null && next.status === "done") return next;
+  return finish;
 }
 
 /**
@@ -61,8 +75,8 @@ const noOffer: RunOffer = { startedAt: null, canStart: false };
 
 // Blocked always deserves a nudge; a finished run only matters while a session is still open, since it
 // asks whether to end it. A new run offers to start a session, keyed by the run so a Blocked moment in
-// the middle does not bring a dismissed offer back. `since` is when the agent entered its status, `finishedAt` when it last
-// finished a run (see nextFinishedAt).
+// the middle does not bring a dismissed offer back. `since` is when the agent entered its status, `finishedAt` when the
+// finish the reminder is about happened (see nextFinish), which can outlast another agent starting to work.
 export function activeReminder(
   status: AgentState,
   since: string | null,

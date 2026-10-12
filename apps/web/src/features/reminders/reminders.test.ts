@@ -1,21 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentState } from "../agent-state/useAgentState";
-import { activeReminder, dismiss, initialReminders, nextFinishedAt, nextRunStartedAt, snooze } from "./reminders";
+import { activeReminder, dismiss, type FinishPoint, initialReminders, nextFinish, nextRunStartedAt, snooze } from "./reminders";
 
 const T = "2026-10-11T10:00:00Z";
 
-// Replays agent states through nextFinishedAt, as useAgentState does, and returns where it ends up.
-function replay(states: [AgentState, string][]): string | null {
+type Step = [AgentState, string, string?] | "ack";
+
+// Replays agent states (status, at, pane, default "1") through nextFinish, as useAgentState does, with
+// "ack" standing for the session ending, and returns the finish it ends up on.
+function replayFinish(steps: Step[]): FinishPoint | null {
   let previous: AgentState | null = null;
-  let finishedAt: string | null = null;
-  for (const [status, at] of states) {
-    finishedAt = nextFinishedAt(previous, status, at, finishedAt);
+  let finish: FinishPoint | null = null;
+  let acknowledged: string | null = null;
+  for (const step of steps) {
+    if (step === "ack") {
+      acknowledged = finish?.at ?? null;
+      continue;
+    }
+    const [status, at, pane = "1"] = step;
+    finish = nextFinish(previous, { status, at, pane }, finish, finish !== null && acknowledged === finish.at);
     previous = status;
   }
-  return finishedAt;
+  return finish;
 }
 
-describe("nextFinishedAt", () => {
+const replay = (steps: Step[]) => replayFinish(steps)?.at ?? null;
+
+describe("nextFinish", () => {
   test("leaving Working for Idle or Done marks the run finished", () => {
     expect(replay([["working", "t1"], ["idle", "t2"]])).toBe("t2");
     expect(replay([["working", "t1"], ["done", "t2"]])).toBe("t2");
@@ -27,7 +38,7 @@ describe("nextFinishedAt", () => {
     expect(replay([["working", "t1"], ["idle", "t2"], ["idle", "t3"]])).toBe("t2");
   });
 
-  test("a new run clears it, and the next finish gets a new moment", () => {
+  test("the agent that finished starting again clears it, and its next finish is new", () => {
     expect(replay([["working", "t1"], ["idle", "t2"], ["working", "t3"]])).toBeNull();
     expect(replay([["working", "t1"], ["idle", "t2"], ["working", "t3"], ["idle", "t4"]])).toBe("t4");
   });
@@ -36,6 +47,22 @@ describe("nextFinishedAt", () => {
     expect(replay([["done", "t1"]])).toBe("t1");
     expect(replay([["idle", "t1"]])).toBeNull();
     expect(replay([["idle", "t1"], ["done", "t2"]])).toBe("t2");
+  });
+
+  test("another machine starting keeps the finish, and its own finish does not replace it", () => {
+    const steps: Step[] = [["working", "t1", "a"], ["done", "t2", "a"], ["working", "t3", "gpu:b"]];
+    expect(replayFinish(steps)).toEqual({ status: "done", at: "t2", pane: "a" });
+    expect(replayFinish([...steps, ["done", "t4", "gpu:b"]])).toEqual({ status: "done", at: "t2", pane: "a" });
+    expect(replay([...steps, ["blocked", "t4", "gpu:b"], ["working", "t5", "gpu:b"], ["idle", "t6", "gpu:b"]])).toBe("t2");
+  });
+
+  test("the first agent starting again while another works clears it", () => {
+    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], ["working", "t3", "gpu:b"], ["working", "t4", "a"]])).toBeNull();
+  });
+
+  test("once the session has ended, the next finish is new", () => {
+    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], "ack", ["working", "t3", "gpu:b"]])).toBeNull();
+    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], "ack", ["working", "t3", "gpu:b"], ["done", "t4", "gpu:b"]])).toBe("t4");
   });
 });
 
@@ -122,6 +149,15 @@ describe("activeReminder", () => {
     const state = dismiss(initialReminders, { kind: "working", since: T });
     expect(activeReminder("working", "t3", null, false, state, 0, run)).toBeNull();
     expect(activeReminder("working", "t5", null, false, state, 0, { startedAt: "t5", canStart: true })).toEqual({ kind: "working", since: "t5" });
+  });
+
+  test("a finish held while another machine works keeps its reminder and its snooze", () => {
+    const finishedAt = replay([["working", "t1", "a"], ["done", T, "a"], ["working", "t3", "gpu:b"], ["done", "t4", "gpu:b"]]);
+    expect(activeReminder("done", "t4", finishedAt, true, initialReminders, 0)).toEqual({ kind: "done", since: T });
+    const state = snooze(initialReminders, { kind: "done", since: T }, 60_000, 0);
+    expect(activeReminder("done", "t4", finishedAt, true, state, 10)).toBeNull();
+    const meanwhile = replay([["working", "t1", "a"], ["done", T, "a"], ["working", "t3", "gpu:b"]]);
+    expect(activeReminder("working", "t3", meanwhile, true, initialReminders, 0)).toEqual({ kind: "done", since: T });
   });
 
   test("a snoozed offer comes back after the snooze while the run goes on", () => {

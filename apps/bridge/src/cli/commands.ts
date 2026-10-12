@@ -43,6 +43,15 @@ export async function doctor(paths: Paths, version: string): Promise<number> {
   const socket = process.env.UHP_SOCKET_PATH || process.env.LUVUS_SOCKET_PATH || luvusSocket();
   check(existsSync(socket), `Luvus socket: ${socket}`, `Luvus socket not found at ${socket}: brainrotnt waits for it (set LUVUS_SOCKET_PATH if it lives elsewhere)`, true);
 
+  const { discoverMachines } = await import("../infra/uhp-client");
+  const { machines, note } = await discoverMachines();
+  if (machines.length === 0) lines.push(`  ${dim(`- Luvus machines: ${note}`)}`);
+  for (const machine of machines) {
+    // The same command the app streams from, so a pass here means the machine's agents will show.
+    const { code, stdout, stderr } = await run(["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", machine.destination, `'${machine.binary}' --session '${machine.session}' uhp capabilities`]);
+    check(code === 0 && stdout.trim().startsWith("{"), `Luvus machine ${machine.id}: ${machine.destination} (session ${machine.session})`, `Luvus machine ${machine.id}: ${machine.destination} cannot be reached with ssh -o BatchMode=yes (${(stderr || stdout).trim().split("\n").at(-1) || `exit ${code}`}); its agents will not show`, true);
+  }
+
   const running = await findRunning(paths.lock);
   if (running) check(true, `running: http://localhost:${running.port} (pid ${running.pid}, ${running.version})`, "");
   else {

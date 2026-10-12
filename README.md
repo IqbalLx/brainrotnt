@@ -31,7 +31,7 @@ Then open a new terminal and run `brnt` (or `brainrotnt`). It prints a link and 
 ```
 
 - **One program, one port.** The web app, the API, the live agent feed and the MCP server are all in a single binary. It uses port 8787, or the next free port if that is taken (`--port` picks one exactly). Running `brnt` while it is already running just shows the link again.
-- **Your data stays put.** Everything lives in `~/.brainrotnt`: the program in `bin/`, your problems and sessions in `data/`. On the first start it creates the database and loads the starter problems. It finds Luvus by itself (`$LUVUS_SOCKET_PATH`, else `~/.luvus/luvus.sock`) and waits for it if it is not running.
+- **Your data stays put.** Everything lives in `~/.brainrotnt`: the program in `bin/`, your problems and sessions in `data/`. On the first start it creates the database and loads the starter problems. It finds Luvus by itself (`$LUVUS_SOCKET_PATH`, else `~/.luvus/luvus.sock`), waits for it if it is not running, and also follows the agents on your [Luvus machines](#agents-on-other-machines).
 - **Updating** is running the install command again, or `brnt update`. Only `bin/` is replaced. Before a new version changes the database, the app copies it to `data/backups/` (the last 3 are kept), so an update can never lose your progress.
 - **On your phone or another computer:** `brnt --network` also serves on your local network and prints a link with an access key, plus a QR code. Other devices need that link (the key changes on every start). MCP and the debug endpoints stay reachable from your own computer only, and code answers and test runs from other devices are refused unless you add `--allow-remote-code`, because they run on your machine.
 - `brnt doctor` checks the installation, Python, the sandbox, Luvus and Claude Code. `brnt setup claude` registers the MCP server with Claude Code for all projects and installs the problem-writing skill (the installer offers this the first time). `brnt uninstall` removes the app and its PATH line and keeps your data (`--purge` deletes that too).
@@ -74,12 +74,20 @@ Inside a Luvus pane, `$LUVUS_SOCKET_PATH` is already set and is used automatical
 
 The bridge connects to the socket with your full local user authority and only reads state. Luvus named pipes (Windows) are not supported yet, and this path has been tested against a fake server written from the UHP 1.0 spec, not against a live Luvus.
 
+### Agents on other machines
+
+If you use [Luvus machines](https://luvus.dev/docs/guides/machines/), the agents on a remote machine report to that machine's Luvus server, not to this computer's socket. So the bridge also follows every enabled machine from `luvus machine list`. For each one it runs `luvus uhp events` (a stream) and `luvus uhp proxy` (for `agent.list`) on the machine over your own `ssh`. It uses the machine's saved destination, remote binary and preferred session. Nothing listens on a port and no socket is forwarded. SSH has to work without a prompt (`ssh -o BatchMode=yes <destination> echo ok`), which Luvus machines need anyway. `brnt doctor` checks each machine.
+
+Remote panes are named `<machine id>:<pane>`. The banner and the agent pill show the machine's label. The state is still one state across every pane on every machine, as below. When one agent finishes while another still works, nothing is shown until the last one finishes. When agents finish one after another, the first finish raises the done reminder, and later starts and finishes elsewhere keep it as it is instead of hiding it or raising it again. Only the agent that finished starting again, or the session ending, lets a new finish through.
+
+Machines are read once at start, so restart brainrotnt after adding one. `BRAINROTNT_MACHINES=off` follows only this computer, and `BRAINROTNT_MACHINES=build,gpu` follows only those ids. A machine that cannot be reached is retried with backoff (up to a minute). If it stays away for 30 seconds, its panes stop counting.
+
 ### When the agent state does not update
 
 The state travels three hops: Luvus → the bridge's UHP client → the SSE stream → the browser. Check them in order and stop at the first one that is wrong.
 
 1. **Is Luvus sending?** `bun run debug:uhp` subscribes to the socket itself and prints every raw frame with a timestamp (`--list` prints one `agent.list` reply instead, `--for 60` stops after a minute). Change the agent's state (send it a prompt, let it finish) and look for `pane.agent_status_changed`. Expect a lot of `terminal.output_ready` too. If no status event appears, the problem is in Luvus, not here.
-2. **Is the bridge receiving and applying it?** `curl -s localhost:8787/api/debug/agent-state | jq` shows `connection` (should be `subscribed`), `eventCounts` per event name, and the recent frames, each with an `outcome` such as `applied: pane 18 is working` or `ignored: data has no string pane and status`. `panes` is the bridge's table and `current` is what it published. Only one state is shown, the most urgent across panes (blocked > working > done > idle), so an idle pane can stay hidden behind a working one. Run the bridge with `UHP_DEBUG=1` to see the same thing live in its console.
+2. **Is the bridge receiving and applying it?** `curl -s localhost:8787/api/debug/agent-state | jq` shows `connection` (should be `subscribed`; `sources` has the same for each Luvus machine, with its `lastError`), `eventCounts` per event name, and the recent frames, each with an `outcome` such as `applied: pane 18 is working` or `ignored: data has no string pane and status`. `panes` is the bridge's table and `current` is what it published. Only one state is shown, the most urgent across panes (blocked > working > done > idle), so an idle pane can stay hidden behind a working one. Run the bridge with `UHP_DEBUG=1` to see the same thing live in its console.
 3. **Is the stream delivering it?** `bun run debug:sse` reads the stream as the browser does, with timestamps, how long ago each state was published, and `GAP` when an id is skipped. Add `--url http://localhost:5173` to go through the Vite proxy. To test the stream and the UI without Luvus, publish a state yourself: `curl -s -X POST localhost:8787/api/debug/agent-state -H 'content-type: application/json' -d '{"status":"blocked"}'`.
 4. **Is the browser handling it?** In the browser console run `localStorage.setItem("debug", "agent-state")` and reload: every open, error, ping and event is logged with its id and delay. The Network tab's EventStream view for `/api/agent-state/stream` shows the raw events.
 
@@ -92,6 +100,7 @@ The state travels three hops: Luvus → the bridge's UHP client → the SSE stre
 | `WEB_ORIGIN` | `http://localhost:5173` | bridge | Allowed CORS origin |
 | `UHP_SOCKET_PATH` | unset | bridge | Luvus socket; unset means the mock agent in development, and `~/.luvus/luvus.sock` in the installed app |
 | `BRAINROTNT_HOME` | `~/.brainrotnt` | installed app | where the program (`bin/`) and your data (`data/`) live |
+| `BRAINROTNT_MACHINES` | `all` | bridge | Luvus machines to follow over SSH: `all`, `off`, or comma-separated ids |
 | `UHP_DEBUG` | unset | bridge | `1` prints every UHP frame, published state and SSE client to the bridge console |
 | `BRIDGE_URL` | `http://127.0.0.1:8787` | web | Where the Vite dev server proxies `/api` |
 

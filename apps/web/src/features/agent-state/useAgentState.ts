@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { nextFinishedAt, nextRunStartedAt } from "../reminders/reminders";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { nextFinish, nextRunStartedAt } from "../reminders/reminders";
 
 export type AgentState = "idle" | "working" | "blocked" | "done";
 
@@ -10,6 +10,8 @@ export interface AgentStateEvent {
   project: string;
   cwd: string;
   branch: string | null;
+  /** The Luvus machine's label, or null for this computer. */
+  machine?: string | null;
   at: string;
 }
 
@@ -33,8 +35,11 @@ export function useAgentState() {
   // render and hide the transition from an effect. The first event is only a baseline, so loading the
   // page mid-run starts nothing.
   const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
-  // When the agent last finished a run (left Working or Blocked for Idle or Done), for the reminder.
-  const [finishedAt, setFinishedAt] = useState<string | null>(null);
+  // The finish the done reminder is about (see nextFinish), with the agent that finished, so the reminder
+  // names it even after another agent on another pane or machine has taken the state over.
+  const [finish, setFinish] = useState<AgentStateEvent | null>(null);
+  // The `at` of a finish whose session has ended: the next finish is news again.
+  const acknowledged = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -63,7 +68,7 @@ export function useAgentState() {
       }
       if (lastStatus.current !== next.status) setSince(next.at);
       const previous = lastStatus.current;
-      setFinishedAt((current) => nextFinishedAt(previous, next.status, next.at, current));
+      setFinish((current) => nextFinish(previous, next, current, current !== null && acknowledged.current === current.at));
       setRunStartedAt((current) => nextRunStartedAt(previous, next.status, next.at, current));
       lastStatus.current = next.status;
       setEvent(next);
@@ -71,5 +76,13 @@ export function useAgentState() {
     return () => source.close();
   }, []);
 
-  return { event, status: event?.status ?? "idle", since, finishedAt, runStartedAt, connected };
+  // Called when the session the finish reminded about ends, by acting on the reminder or otherwise.
+  const acknowledgeFinish = useCallback(() => {
+    setFinish((current) => {
+      acknowledged.current = current?.at ?? null;
+      return current;
+    });
+  }, []);
+
+  return { event, status: event?.status ?? "idle", since, finishedAt: finish?.at ?? null, finish, runStartedAt, connected, acknowledgeFinish };
 }

@@ -51,7 +51,7 @@ export function ReminderCard({ reminder, event, onAct, onSnooze, onDismiss }: Re
     const tick = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(tick);
   }, []);
-  const where = [event?.agent, event?.project || event?.cwd, event?.branch].filter(Boolean).join(" · ");
+  const where = [event?.machine, event?.agent, event?.project || event?.cwd, event?.branch].filter(Boolean).join(" · ");
 
   return (
     <section

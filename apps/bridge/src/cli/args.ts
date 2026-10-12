@@ -30,6 +30,7 @@ Options for starting:
 Environment:
   BRAINROTNT_HOME          where data lives (default: ~/.brainrotnt)
   LUVUS_SOCKET_PATH        the Luvus socket (default: ~/.luvus/luvus.sock)
+  BRAINROTNT_MACHINES      Luvus machines to follow over SSH: all (default), off, or ids like build,gpu
   BRAINROTNT_ALLOW_UNSANDBOXED=1  run reference and code answers without network isolation
 `;
 
