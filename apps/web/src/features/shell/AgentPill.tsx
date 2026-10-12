@@ -14,7 +14,7 @@ const TONE: Record<AgentState, { dot: string; border: string }> = {
 // The agent at a glance: who, how long this run has been going, and its state.
 export function AgentPill({ status, event, runMs }: { status: AgentState; event: AgentStateEvent | null; runMs: number }) {
   const tone = TONE[status];
-  const who = [event?.agent, event?.project].filter(Boolean).join(" · ");
+  const who = [event?.machine, event?.agent, event?.project].filter(Boolean).join(" · ");
   return (
     <div className={cn("flex items-center gap-2 rounded-full border bg-surface-raised px-3 py-1", tone.border)}>
       <span className="relative flex size-2" aria-hidden>

@@ -61,13 +61,13 @@ describe("/api/debug/agent-state", () => {
 
   test("an injected state reaches an open SSE stream with consecutive ids", async () => {
     const { uhp, stream } = setup();
-    uhp.inject({ status: "working", pane: "1", agent: "a", project: "p", cwd: "", branch: null });
+    uhp.inject({ status: "working", pane: "1", agent: "a", project: "p", cwd: "", branch: null, machine: null });
 
     const res = await stream.route.request("/");
     const pending = readEvents(res, 2);
     // Let the stream send the current state and register its listener before publishing.
     await Bun.sleep(20);
-    uhp.inject({ status: "done", pane: "1", agent: "a", project: "p", cwd: "", branch: null });
+    uhp.inject({ status: "done", pane: "1", agent: "a", project: "p", cwd: "", branch: null, machine: null });
 
     const events = await pending;
     expect(events.map((e) => e.data.status)).toEqual(["working", "done"]);
