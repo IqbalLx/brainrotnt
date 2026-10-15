@@ -39,16 +39,13 @@ export interface FinishPoint {
  * one counts, and Done to Idle keeps the same finish. A first Done counts too, so a page loaded after the
  * agent finished still reminds; a first Idle does not, since nothing says a run just ended.
  *
- * With agents on several panes or machines, one finish stands for them all until it is acknowledged
- * (`acknowledged`: the session it reminded about has ended): another agent starting or finishing keeps
- * it, so the reminder neither disappears nor comes back as new. Only the agent that finished starting
- * again clears it. Agents that overlap need nothing here: the bridge shows Working while any of them
- * works, so only the last one to finish is seen finishing.
+ * Any agent starting work clears it, on whichever pane or machine: the reminder must never say the agent
+ * has finished while the pill says it works. Agents that overlap need nothing here: the bridge shows
+ * Working while any of them works, so only the last one to finish is seen finishing.
  */
-export function nextFinish<T extends FinishPoint>(previous: AgentState | null, next: T, finish: T | null, acknowledged: boolean): T | null {
-  const held = finish !== null && !acknowledged;
-  if (busy(next.status)) return held && next.pane !== finish.pane ? finish : null;
-  if (busy(previous)) return held ? finish : next;
+export function nextFinish<T extends FinishPoint>(previous: AgentState | null, next: T, finish: T | null): T | null {
+  if (busy(next.status)) return null;
+  if (busy(previous)) return next;
   if (finish === null && next.status === "done") return next;
   return finish;
 }
