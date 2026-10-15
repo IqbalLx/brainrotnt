@@ -154,10 +154,19 @@ interface PaneState {
   updatedAt: number;
 }
 
+/**
+ * Luvus reports every pane, agent or not. `command_fallback` means it found no agent and is
+ * describing whatever command runs there (zsh, atuin, vim), so its busy/idle is not an agent's.
+ */
+export function isAgentPane(raw: Record<string, unknown>): boolean {
+  return raw.authority !== "command_fallback";
+}
+
 function toPaneState(raw: unknown, prefix: string, machine: string | null): PaneState | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.pane !== "string" || typeof r.status !== "string") return null;
+  if (!isAgentPane(r)) return null;
   // "unknown" means Luvus has no evidence either way; it never demands attention.
   const status: AgentState =
     r.status === "working" || r.status === "blocked" || r.status === "done" ? r.status : "idle";
@@ -495,7 +504,16 @@ class UhpSource {
   private handleEvent(frame: Record<string, any>, stream: Stream): string {
     switch (frame.event) {
       case "pane.agent_status_changed": {
-        const state = toPaneState(frame.data, this.prefix, this.machine);
+        const data = frame.data;
+        if (typeof data?.pane === "string" && !isAgentPane(data)) {
+          // Not an agent (any more): a plain shell, or an agent that exited back to one.
+          const pane = this.prefix + data.pane;
+          this.eventPanes.add(pane);
+          if (!this.panes.delete(pane)) return `ignored: pane ${pane} runs ${data.agent || "a command"}, not an agent`;
+          this.host.changed();
+          return `applied: pane ${pane} no longer runs an agent`;
+        }
+        const state = toPaneState(data, this.prefix, this.machine);
         if (!state) return "ignored: data has no string pane and status";
         this.eventPanes.add(state.pane);
         this.panes.set(state.pane, state);
