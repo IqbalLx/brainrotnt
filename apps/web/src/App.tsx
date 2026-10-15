@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { BankPage } from "@/features/bank/BankPage";
 import { useAgentState } from "@/features/agent-state/useAgentState";
 import { ReminderCard } from "@/features/reminders/ReminderCard";
@@ -15,7 +15,7 @@ import { useHealth } from "@/features/shell/useHealth";
 import { useRoute } from "@/features/shell/useRoute";
 
 export default function App() {
-  const { event, status, since, finishedAt, finish, runStartedAt, connected, acknowledgeFinish } = useAgentState();
+  const { event, status, since, finishedAt, finish, runStartedAt, connected } = useAgentState();
   const { settings, update } = useSettings();
   const session = useSession(status);
   const timer = useRunTimer(status);
@@ -25,12 +25,6 @@ export default function App() {
   const reminders = useReminders(status, since, finishedAt, session.open, { startedAt: runStartedAt, canStart });
   const health = useHealth();
 
-  // A finish stands for every agent until the session it reminded about ends (see nextFinish).
-  const wasOpen = useRef(session.open);
-  useEffect(() => {
-    if (wasOpen.current && !session.open) acknowledgeFinish();
-    wasOpen.current = session.open;
-  }, [session.open, acknowledgeFinish]);
   const { route, navigate } = useRoute();
 
   // When a session ends, its review opens.

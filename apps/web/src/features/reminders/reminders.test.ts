@@ -4,21 +4,15 @@ import { activeReminder, dismiss, type FinishPoint, initialReminders, nextFinish
 
 const T = "2026-10-11T10:00:00Z";
 
-type Step = [AgentState, string, string?] | "ack";
+type Step = [AgentState, string, string?];
 
-// Replays agent states (status, at, pane, default "1") through nextFinish, as useAgentState does, with
-// "ack" standing for the session ending, and returns the finish it ends up on.
+// Replays agent states (status, at, pane, default "1") through nextFinish, as useAgentState does, and
+// returns the finish it ends up on.
 function replayFinish(steps: Step[]): FinishPoint | null {
   let previous: AgentState | null = null;
   let finish: FinishPoint | null = null;
-  let acknowledged: string | null = null;
-  for (const step of steps) {
-    if (step === "ack") {
-      acknowledged = finish?.at ?? null;
-      continue;
-    }
-    const [status, at, pane = "1"] = step;
-    finish = nextFinish(previous, { status, at, pane }, finish, finish !== null && acknowledged === finish.at);
+  for (const [status, at, pane = "1"] of steps) {
+    finish = nextFinish(previous, { status, at, pane }, finish);
     previous = status;
   }
   return finish;
@@ -49,20 +43,16 @@ describe("nextFinish", () => {
     expect(replay([["idle", "t1"], ["done", "t2"]])).toBe("t2");
   });
 
-  test("another machine starting keeps the finish, and its own finish does not replace it", () => {
+  test("another pane or machine starting clears it, so it never contradicts Working", () => {
     const steps: Step[] = [["working", "t1", "a"], ["done", "t2", "a"], ["working", "t3", "gpu:b"]];
-    expect(replayFinish(steps)).toEqual({ status: "done", at: "t2", pane: "a" });
-    expect(replayFinish([...steps, ["done", "t4", "gpu:b"]])).toEqual({ status: "done", at: "t2", pane: "a" });
-    expect(replay([...steps, ["blocked", "t4", "gpu:b"], ["working", "t5", "gpu:b"], ["idle", "t6", "gpu:b"]])).toBe("t2");
+    expect(replayFinish(steps)).toBeNull();
+    expect(replayFinish([...steps, ["done", "t4", "gpu:b"]])).toEqual({ status: "done", at: "t4", pane: "gpu:b" });
+    expect(replay([...steps, ["blocked", "t4", "gpu:b"], ["working", "t5", "gpu:b"], ["idle", "t6", "gpu:b"]])).toBe("t6");
   });
 
-  test("the first agent starting again while another works clears it", () => {
-    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], ["working", "t3", "gpu:b"], ["working", "t4", "a"]])).toBeNull();
-  });
-
-  test("once the session has ended, the next finish is new", () => {
-    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], "ack", ["working", "t3", "gpu:b"]])).toBeNull();
-    expect(replay([["working", "t1", "a"], ["done", "t2", "a"], "ack", ["working", "t3", "gpu:b"], ["done", "t4", "gpu:b"]])).toBe("t4");
+  test("a finish seen before the pane started working again does not linger", () => {
+    // A finish hours old must not come back as the reminder while another agent works.
+    expect(replay([["working", "t1", "shell"], ["idle", "t2", "shell"], ["working", "t3", "agent"]])).toBeNull();
   });
 });
 
@@ -151,13 +141,12 @@ describe("activeReminder", () => {
     expect(activeReminder("working", "t5", null, false, state, 0, { startedAt: "t5", canStart: true })).toEqual({ kind: "working", since: "t5" });
   });
 
-  test("a finish held while another machine works keeps its reminder and its snooze", () => {
-    const finishedAt = replay([["working", "t1", "a"], ["done", T, "a"], ["working", "t3", "gpu:b"], ["done", "t4", "gpu:b"]]);
-    expect(activeReminder("done", "t4", finishedAt, true, initialReminders, 0)).toEqual({ kind: "done", since: T });
-    const state = snooze(initialReminders, { kind: "done", since: T }, 60_000, 0);
-    expect(activeReminder("done", "t4", finishedAt, true, state, 10)).toBeNull();
+  test("no done reminder while another agent works, and its own finish is a new one", () => {
     const meanwhile = replay([["working", "t1", "a"], ["done", T, "a"], ["working", "t3", "gpu:b"]]);
-    expect(activeReminder("working", "t3", meanwhile, true, initialReminders, 0)).toEqual({ kind: "done", since: T });
+    expect(activeReminder("working", "t3", meanwhile, true, initialReminders, 0)).toBeNull();
+    const finishedAt = replay([["working", "t1", "a"], ["done", T, "a"], ["working", "t3", "gpu:b"], ["done", "t4", "gpu:b"]]);
+    const dismissed = dismiss(initialReminders, { kind: "done", since: T });
+    expect(activeReminder("done", "t4", finishedAt, true, dismissed, 0)).toEqual({ kind: "done", since: "t4" });
   });
 
   test("a snoozed offer comes back after the snooze while the run goes on", () => {
