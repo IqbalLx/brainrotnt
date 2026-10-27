@@ -33,7 +33,7 @@ export async function run(embedded: Embedded, argv = process.argv.slice(2)): Pro
       code = await mcpStdio({ paths: where, version: embedded.version, migrations: embedded.migrations });
       break;
     case "setup-claude":
-      code = await setupClaude(where, embedded.skill);
+      code = await setupClaude(embedded.skill);
       break;
     case "setup-sandbox":
       code = await setupSandbox(command);

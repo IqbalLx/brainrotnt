@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { DEFAULT_PORT } from "./args";
 import { findRunning } from "./lock";
-import { claudeSkillDir, INSTALL_URL, luvusSocket, type Paths } from "./paths";
+import { claudeSkillDir, INSTALL_URL, luvusSocket, mcpCommand, type Paths } from "./paths";
 import { acceptsConnections } from "./ports";
 import { APPARMOR_PROFILE, appArmorProfileInstalled } from "./sandbox-setup";
 import { removePathBlock } from "./shell-path";
@@ -61,10 +61,10 @@ export async function doctor(paths: Paths, version: string): Promise<number> {
   }
 
   if (Bun.which("claude")) {
-    const { stdout } = await run(["claude", "mcp", "get", "brainrotnt"]);
-    const url = stdout.match(/https?:\/\/\S+\/mcp/)?.[0];
-    const want = `http://127.0.0.1:${running?.port ?? DEFAULT_PORT}/mcp`;
-    check(url === want, `Claude Code MCP: ${url}`, url ? `Claude Code MCP points at ${url}, not ${want}: run brnt setup claude` : "Claude Code has no brainrotnt MCP server: run brnt setup claude", true);
+    const { code, stdout } = await run(["claude", "mcp", "get", "brainrotnt"]);
+    const want = mcpCommand().join(" ");
+    const current = stdout.includes("stdio") && stdout.includes(mcpCommand()[0]);
+    check(current, `Claude Code MCP: ${want}`, code === 0 ? "Claude Code's brainrotnt MCP server is an older registration: run brnt setup claude" : "Claude Code has no brainrotnt MCP server: run brnt setup claude", true);
     check(existsSync(claudeSkillDir()), `Claude Code skill: ${claudeSkillDir()}`, "the brainrotnt-problems skill is not installed: run brnt setup claude", true);
   } else lines.push(`  ${dim("- Claude Code not found (optional: it writes new problems for you)")}`);
 
@@ -74,22 +74,22 @@ export async function doctor(paths: Paths, version: string): Promise<number> {
 }
 
 /** `brnt setup claude`: register the MCP server for every project and install the authoring skill. */
-export async function setupClaude(paths: Paths, skill: Record<string, string>): Promise<number> {
+export async function setupClaude(skill: Record<string, string>): Promise<number> {
   if (!Bun.which("claude")) {
     console.error(`\n  ${fail("Claude Code (the claude command) was not found.")} Install it from https://claude.com/claude-code, then run brnt setup claude again.\n`);
     return 1;
   }
-  const running = await findRunning(paths.lock);
-  const url = `http://127.0.0.1:${running?.port ?? DEFAULT_PORT}/mcp`;
+  const command = mcpCommand();
 
-  // Replace any earlier registration (another port, another scope) rather than adding a second one.
+  // Replace any earlier registration (such as the old HTTP one) rather than adding a second one.
   await run(["claude", "mcp", "remove", "brainrotnt", "-s", "user"]);
-  const added = await run(["claude", "mcp", "add", "--transport", "http", "-s", "user", "brainrotnt", url]);
+  const added = await run(["claude", "mcp", "add", "-s", "user", "brainrotnt", "--", ...command]);
   if (added.code !== 0) {
     console.error(`\n  ${fail(`claude mcp add failed:`)} ${(added.stderr || added.stdout).trim()}\n`);
     return 1;
   }
   const project = await run(["claude", "mcp", "get", "brainrotnt"]);
+  const shadowed = !/scope: user/i.test(project.stdout);
 
   const dir = claudeSkillDir();
   rmSync(dir, { recursive: true, force: true });
@@ -102,12 +102,11 @@ export async function setupClaude(paths: Paths, skill: Record<string, string>): 
   console.log(
     [
       ``,
-      `  ${ok(`MCP server registered for all projects: ${url}`)}`,
+      `  ${ok(`MCP server registered for all projects: ${command.join(" ")}`)}`,
       `  ${ok(`Skill installed: ${dir}`)}`,
-      project.stdout.includes(url) ? "" : `  ${warn("A project-level brainrotnt server with another URL may override it there; check with claude mcp list.")}`,
+      shadowed ? `  ${warn("A brainrotnt server registered for this project overrides it here; remove that one (see claude mcp get brainrotnt).")}` : "",
       ``,
       `  In Claude Code, try: ${bold('"use brainrotnt to add 5 stats problems on confidence intervals"')}`,
-      running ? "" : dim(`  Start brainrotnt (brnt) before asking: the MCP server is part of it.`),
       ``,
     ]
       .filter((line, i, all) => line !== "" || all[i - 1] !== "")

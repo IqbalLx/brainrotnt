@@ -10,7 +10,7 @@ Version 1.3.0. brainrotnt is a local app for practising STEM problems and trivia
 
 ## Before you write anything
 
-If the brainrotnt tools (`get_schema`, `submit_problems`, ...) are not available, brainrotnt is not running or not registered. Ask the user to start it with `brnt` (the installed app) and, if Claude Code has never been connected, to run `brnt setup claude`, then reconnect with `/mcp`. `brnt doctor` reports what is missing. Do not guess the tools' behaviour without them.
+If the brainrotnt tools (`get_schema`, `submit_problems`, ...) are not available, the server is not registered or failed to start. Ask the user to run `brnt setup claude` (the installed app), then reconnect with `/mcp`. `brnt doctor` reports what is missing. Do not guess the tools' behaviour without them.
 
 1. Call `get_schema`. The live schema it returns is the truth; `references/schema.md` is a snapshot for reading offline and may be older.
 2. Call `get_coverage` to find thin topics and difficulties, and problems still missing hints or explanations.
