@@ -4,6 +4,7 @@ import type { MigrationSource } from "../db/migrations";
 import type { StaticAssets } from "../infra/static-assets";
 import { HELP, parseArgs } from "./args";
 import { doctor, setupClaude, uninstall, update } from "./commands";
+import { mcpStdio } from "./mcp-stdio";
 import { paths } from "./paths";
 import { setupSandbox } from "./sandbox-setup";
 import { start } from "./start";
@@ -27,6 +28,9 @@ export async function run(embedded: Embedded, argv = process.argv.slice(2)): Pro
       break;
     case "doctor":
       code = await doctor(where, embedded.version);
+      break;
+    case "mcp":
+      code = await mcpStdio({ paths: where, version: embedded.version, migrations: embedded.migrations });
       break;
     case "setup-claude":
       code = await setupClaude(where, embedded.skill);

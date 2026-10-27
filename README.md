@@ -179,6 +179,14 @@ The bridge exposes an MCP endpoint, so Claude Code can grow the problem bank usi
 claude mcp add --transport http brainrotnt http://127.0.0.1:8787/mcp
 ```
 
+Clients that launch a command instead of calling a URL, such as Claude Desktop, use `brnt mcp`: the same tools over stdio, working on the database directly, so brainrotnt does not have to be running. In `claude_desktop_config.json`, give the full path, since Desktop does not read your shell's PATH:
+
+```json
+{ "mcpServers": { "brainrotnt": { "command": "/Users/you/.brainrotnt/bin/brnt", "args": ["mcp"] } } }
+```
+
+On macOS, where code cannot be network-isolated, add `"env": { "BRAINROTNT_ALLOW_UNSANDBOXED": "1" }` to that entry if you start brainrotnt with it set; otherwise STEM problems are rejected because their reference solutions cannot run.
+
 Then ask for what you want, for example "use brainrotnt to add 5 stats problems on confidence intervals, difficulty 2 to 4". Claude Code gets six tools:
 
 | Tool | Purpose |

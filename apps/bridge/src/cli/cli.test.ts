@@ -39,6 +39,8 @@ describe("parseArgs", () => {
 
   test("subcommands", () => {
     expect(parseArgs(["doctor"])).toEqual({ name: "doctor" });
+    expect(parseArgs(["mcp"])).toEqual({ name: "mcp" });
+    expect(parseArgs(["mcp", "--port", "1"])).toMatchObject({ name: "error" });
     expect(parseArgs(["setup", "claude"])).toEqual({ name: "setup-claude" });
     expect(parseArgs(["setup", "sandbox"])).toEqual({ name: "setup-sandbox", check: false });
     expect(parseArgs(["setup", "sandbox", "--check"])).toEqual({ name: "setup-sandbox", check: true });
