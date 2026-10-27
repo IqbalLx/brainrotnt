@@ -24,5 +24,8 @@ export type Paths = ReturnType<typeof paths>;
 export const luvusSocket = () => join(homedir(), ".luvus", "luvus.sock");
 export const claudeSkillDir = () => join(homedir(), ".claude", "skills", "brainrotnt-problems");
 
+/** Launches `brnt mcp` as this process runs: the installed binary, or Bun with the source entry (dev.ts). */
+export const mcpCommand = () => [process.execPath, ...(Bun.main.endsWith(".ts") ? ["run", Bun.main] : []), "mcp"];
+
 export const REPO = "IqbalLx/brainrotnt";
 export const INSTALL_URL = process.env.BRAINROTNT_INSTALL_URL || `https://raw.githubusercontent.com/${REPO}/main/install.sh`;

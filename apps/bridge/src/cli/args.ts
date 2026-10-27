@@ -3,6 +3,7 @@ export const DEFAULT_PORT = 8787;
 export type Command =
   | { name: "start"; port: number | null; network: boolean; open: boolean; allowRemoteCode: boolean; hosts: string[] }
   | { name: "doctor" }
+  | { name: "mcp" }
   | { name: "setup-claude" }
   | { name: "setup-sandbox"; check: boolean }
   | { name: "update"; force: boolean }
@@ -17,6 +18,7 @@ Usage:
   brnt [options]           start brainrotnt and print its link (same as brainrotnt)
   brnt doctor              check the installation, Python, the sandbox, Luvus and Claude Code
   brnt setup claude        register the MCP server with Claude Code and install the problem skill
+  brnt mcp                 serve the MCP tools over stdio, for clients that launch a command (Claude Desktop)
   brnt setup sandbox       on Linux, let brainrotnt isolate code answers where AppArmor blocks it (sudo)
   brnt update [--force]    install the latest release; your data is kept
   brnt uninstall [--purge] remove the app (--purge also deletes your data)
@@ -43,6 +45,8 @@ export function parseArgs(argv: string[]): Command {
   switch (first) {
     case "doctor":
       return rest.length ? unexpected(rest[0]) : { name: "doctor" };
+    case "mcp":
+      return rest.length ? unexpected(rest[0]) : { name: "mcp" };
     case "setup":
       if (rest[0] === "claude" && rest.length === 1) return { name: "setup-claude" };
       // --check is for the command itself: it starts a new process to see whether a just-loaded profile works.
